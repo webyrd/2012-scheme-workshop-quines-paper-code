@@ -1,0 +1,8 @@
+(load "intro.scm")
+(load "language.scm")
+(load "appendixC.scm")
+(load "interpreter.scm")
+(load "extending-interpreter.scm")
+(load "quine-generation.scm")
+(load "appendixB.scm")
+(load "appendixA.scm")
