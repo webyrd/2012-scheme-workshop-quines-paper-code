@@ -59,7 +59,7 @@
       ((null? (cdr pkg*))
        ((pkg-thunk (car pkg*))))
       (else 
-       (ambiguous-pattern/guard name v-expr v pkg*)))))
+       (overlapping-patterns/guards name v-expr v pkg*)))))
 
 (define no-matching-pattern
   (lambda (name v-expr v)
@@ -77,10 +77,9 @@
               name)
       (printf "dmatch overlapping matching clauses~n"))
     (printf "with ~d evaluating to ~d~n" v-expr v)
-    (printf "____________________________________~n")
-    (for-each pretty-print (map pkg-clause pkg*))))
-
-
+    (printf "____________________________________~n")    
+    (for-each pretty-print (map pkg-clause pkg*))
+    (error 'dmatch "")))
 
 
 (define h
