@@ -1,8 +1,47 @@
 {% extends "base_livecode.html" %}
 
-{% block title %}miniKanren{% endblock %}
+{% block title %}miniKanren, Live and Untagged: Quine Generation via Relational Interpreters (Programming Pearl){% endblock %}
 
 {% block content %}
+<ul>
+<li>William E. Byrd</li>
+<li>Eric Holk</li>
+<li>Daniel P. Friedman</li>
+</ul>
+
+<h2>Abstract</h2>
+
+<p class="noindent" >We present relational interpreters for several subsets of Scheme,
+written in the pure logic programming language miniKanren.
+We demonstrate these interpreters running “backwards”—that
+is, generating programs that evaluate to a specified value—and
+show how the interpreters can trivially generate <span 
+class="cmti-9">quines</span>
+(programs that evaluate to themselves). We demonstrate how to
+transform environment-passing interpreters written in Scheme
+into relational interpreters written in miniKanren. We show how
+constraint extensions to core miniKanren can be used to allow
+shadowing of the interpreter’s primitive forms (using the
+<span 
+class="cmti-9">absent</span><!--l. 77--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><mspace width="0.17em" class="thinspace"/><mi 
+>o</mi> </math>
+tree constraint), and to avoid having to tag expressions in the
+languages being interpreted (using disequality constraints and
+symbol/number type-constraints), simplifying the interpreters
+and eliminating the need for parsers/unparsers.
+</p><!--l. 82--><p class="indent" >We provide four appendices to make the code in the
+paper completely self-contained. Three of these appendices
+contain new code: the complete implementation of core
+miniKanren extended with the new constraints; an extended
+relational interpreter capable of running factorial and doing list
+processing; and a simple pattern matcher that uses Dijkstra
+guards. The other appendix presents our preferred version of
+code that has been presented elsewhere: the miniKanren
+relational arithmetic system used in the extended interpreter.
+</p>
+
 <div class="live" id="ex1">
 (load "testall.scm")</div>
 
