@@ -42,6 +42,5077 @@ code that has been presented elsewhere: the miniKanren
 relational arithmetic system used in the extended interpreter.
 </p>
 
+<h3 class="sectionHead"><span class="titlemark">1. </span> <a 
+ id="x1-50001"></a>Introduction</h3>
+<!--l. 4--><p class="noindent" >A <span 
+class="cmti-9">quine </span>is a program that evaluates to itself
+(<span class="cite"><a 
+href="#XGEB79">Hofstadter</a></span> <span class="cite"><a 
+href="#XGEB79">1979</a></span>; <span class="cite"><a 
+href="#Xthe_quine_page">Thompson II</a></span>); the simplest Scheme quines
+are self-evaluating literals, such as numbers and booleans. A
+classic non-trivial quine (<span class="cite"><a 
+href="#Xthe_quine_page">Thompson II</a></span>) is:
+(<span 
+class="cmbx-9">define </span><span 
+class="cmti-9">quine</span><!--l. 2--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><mi 
+>c</mi> </math>
+’((<span 
+class="cmss-9">lambda </span>(<span 
+class="cmss-9">x</span>)
+(<span 
+class="cmss-9">list x </span>(<span 
+class="cmss-9">list </span>(<span 
+class="cmss-9">quote quote</span>) <span 
+class="cmss-9">x</span>)))
+(<span 
+class="cmss-9">quote</span>
+(<span 
+class="cmss-9">lambda </span>(<span 
+class="cmss-9">x</span>)
+(<span 
+class="cmss-9">list x </span>(<span 
+class="cmss-9">list </span>(<span 
+class="cmss-9">quote quote</span>) <span 
+class="cmss-9">x</span>))))))
+</p><!--l. 18--><p class="noindent" >We can easily verify  that                              <span 
+class="cmti-9">quine</span><!--l. 2--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><mi 
+>c</mi></math>
+                                     evaluates to itself:
+                                     </p><!--l. 22--><p class="noindent" >(<span 
+class="cmti-9">equal? </span>(<span 
+class="cmti-9">eval quine</span><!--l. 2--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><mi 
+>c</mi></math>)
+                                     <span 
+class="cmti-9">quine</span><!--l. 2--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><mi 
+>c</mi></math>)
+                                     <!--l. 22--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" > <mo 
+class="MathClass-rel" stretchy="false">⇒</mo></math>
+                                     <span 
+class="cmtt-9">#</span><span 
+class="cmss-9">t</span>
+                                     </p><!--l. 26--><p class="indent" >  For decades programmers have amused themselves by writing
+                                     quines in countless programming languages. Some quines, such
+                                     as those featured in the International Obfuscated C Code
+                                     Contest (<span class="cite"><a 
+href="#Xobfuscated_c">Broukhis et al.</a></span>), are intentionally baroque. Here we
+                                     demonstrate a disciplined approach to the problem: we show
+                                     how to translate a standard environment-passing interpreter
+                                     written as a Scheme function into a relation in the pure logic
+                                     programming language miniKanren (<span class="cite"><a 
+href="#Xbyrdthesis">Byrd</a></span> <span class="cite"><a 
+href="#Xbyrdthesis">2009</a></span>; <span class="cite"><a 
+href="#Xreasoned">Friedman
+                                     et al.</a></span> <span class="cite"><a 
+href="#Xreasoned">2005</a></span>), then show how this relational interpreter
+                                     can be used, without modification, to trivially generate
+                                     quines.<span class="footnote-mark"><a 
+href="quines2.html#fn1x0"><sup class="textsuperscript">1</sup></a></span><a 
+ id="x1-5001f1"></a> 
+                                     </p><!--l. 50--><p class="noindent" >We also show how to generate <span 
+class="cmti-9">twines </span>(twin quines), which are
+                                     distinct programs <span 
+class="cmti-9">p </span>and <span 
+class="cmti-9">q </span>that evaluate to each other,
+                                     and <span 
+class="cmti-9">thrines</span>, which are distinct programs <span 
+class="cmti-9">p</span>, <span 
+class="cmti-9">q</span>, and <span 
+class="cmti-9">r </span>such
+                                     that <span 
+class="cmti-9">p </span>evaluates to <span 
+class="cmti-9">q</span>, <span 
+class="cmti-9">q </span>evaluates to <span 
+class="cmti-9">r</span>, and <span 
+class="cmti-9">r </span>evaluates to
+                                     <span 
+class="cmti-9">p</span>.
+                                     </p><!--l. 75--><p class="indent" >  While generating quines is fun and interesting, our
+                                     approach also illustrates advanced techniques of relational
+                                     programming, such as translating functional programs
+                                     into relational programs, and using constraints to avoid
+                                     having to tag the expressions being interpreted. This last
+                                     point is especially important, as tagging implies the need
+                                     to write parsers and unparsers, and because tagging the
+                                     application line of the interpreter greatly complicates the
+                                     handling of <span 
+class="cmbx-9">quote </span>and <span 
+class="cmti-9">list</span>. Our use of constraints also has the
+                                     important benefit of properly handling shadowing of the
+                                     interpreter’s built-in primitives, such as <span 
+class="cmti-9">list</span>, <span 
+class="cmbx-9">quote</span>, and
+                                     <span 
+class="cmbx-9">lambda</span>.
+                                     </p><!--l. 87--><p class="indent" >  Our approach requires adding several constraint operators to
+                                     core miniKanren. We have previously presented disequality
+                                     constraints in cKanren (<span class="cite"><a 
+href="#XcKanren">Alvis et al.</a></span> <span class="cite"><a 
+href="#XcKanren">2011</a></span>), a general constraint logic
+                                     programming (<span class="cite"><a 
+href="#Xapt03principles">Apt</a></span> <span class="cite"><a 
+href="#Xapt03principles">2003</a></span>) framework inspired by miniKanren; the
+                                     <span 
+class="cmti-9">symbol</span><!--l. 2--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><mspace width="0.17em" class="thinspace"/><mi 
+>o</mi></math>,
+                                     <span 
+class="cmti-9">number</span><!--l. 2--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><mspace width="0.17em" class="thinspace"/><mi 
+>o</mi></math>,
+                                     and <span 
+class="cmti-9">absent</span><!--l. 2--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><mspace width="0.17em" class="thinspace"/><mi 
+>o</mi></math>
+                                     constraints we introduce are also straightforward to implement
+                                     in cKanren. However, we have found that core miniKanren
+                                     augmented with these four constraints is sufficient for
+                                     implementing a wide variety of interesting programs, including
+                                     interpreters and inferencers. This extended miniKanren is
+                                     conceptually simpler than cKanren, and its implementation is
+                                     easier to understand and modify. Programmers needing to use
+                                     domain-specific constraints, such as arithmetic over finite
+                                     domains (CLP(FD)), will find that the techniques described
+                                     here, up to and including quine generation, work equally well in
+                                     cKanren.
+
+</p><!--l. 103--><p class="indent" >Our paper makes the following contributions: </p>
+<ul class="itemize1">
+<li class="itemize">
+<!--l. 105--><p class="indent" >We extend the miniKanren core language with four
+constraint operators (section <a 
+href="#x1-80002.2">2.2<!--tex4ht:ref: mknew --></a>): the disequality constraint
+<!--l. 2--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><mo 
+class="MathClass-rel" stretchy="false">≢</mo></math>;
+type constraints <span 
+class="cmti-9">symbol</span><!--l. 2--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><mspace width="0.17em" class="thinspace"/><mi 
+>o</mi></math>
+and <span 
+class="cmti-9">number</span><!--l. 2--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><mspace width="0.17em" class="thinspace"/><mi 
+>o</mi></math>,
+which are similar  in  spirit  to  Scheme’s  <span 
+class="cmti-9">symbol?  </span>and
+<span 
+class="cmti-9">number? </span>predicates; and the tree constraint <span 
+class="cmti-9">absent</span><!--l. 2--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><mspace width="0.17em" class="thinspace"/><mi 
+>o</mi></math>,
+which ensures  a  symbol  <span 
+class="cmti-9">tag  </span>does  not  occur  inside  a
+term <span 
+class="cmti-9">t</span>. These  constraints  are  extremely  useful  when
+writing logic programs, especially interpreters and type
+inferencers.
+</p></li>
+<li class="itemize">
+<!--l. 114--><p class="indent" >We describe  and  demonstrate  our  methodology  for
+translating interpreters  from  Scheme  to  miniKanren
+(section <a 
+href="#x1-90003">3<!--tex4ht:ref: sec:interpreter --></a>). Our  methodology  is  equally  useful  for
+translating type inferencers.
+</p></li>
+<li class="itemize">
+<!--l. 117--><p class="indent" >We show how <!--l. 2--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><mo 
+class="MathClass-rel" stretchy="false">≢</mo></math>,
+<span 
+class="cmti-9">symbol</span><!--l. 2--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><mspace width="0.17em" class="thinspace"/><mi 
+>o</mi> </math>,
+and <span 
+class="cmti-9">number</span><!--l. 2--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><mspace width="0.17em" class="thinspace"/><mi 
+>o</mi></math>
+can be used when writing an interpreter (or type inferencer)
+to avoid having to tag expressions in the language being
+interpreted, and how <span 
+class="cmti-9">absent</span><!--l. 2--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><mspace width="0.17em" class="thinspace"/><mi 
+>o</mi></math>
+can be used  to  allow  shadowing  of  primitive  forms
+(section <a 
+href="#x1-90003">3<!--tex4ht:ref: sec:interpreter --></a>).
+</p></li>
+<li class="itemize">
+<!--l. 122--><p class="indent" >We present relational interpreters for three subsets of
+Scheme: the call-by-value <!--l. 123--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><mi 
+>λ</mi></math>-calculus
+(section <a 
+href="#x1-90003">3<!--tex4ht:ref: sec:interpreter --></a>); <!--l. 124--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><mi 
+>λ</mi></math>-calculus
+extended with <span 
+class="cmti-9">list </span>and <span 
+class="cmbx-9">quote </span>(section <a 
+href="#x1-100004">4<!--tex4ht:ref: sec:extending-interpreter --></a>); and an extended
+language supporting pairs, conditionals, and arithmetic
+operators, and capable of running factorial (appendix <a 
+href="#x1-15000A">A<!--tex4ht:ref: extendedinterpreter --></a>).
+The relational arithmetic system (appendix <a 
+href="#x1-16000B">B<!--tex4ht:ref: relarithsect --></a>) used in
+the third interpreter  was  first  presented  in  <span class="cite"><a 
+href="#Xreasoned">Friedman
+et al.</a></span> (<span class="cite"><a 
+href="#Xreasoned">2005</a></span>); we include it for completeness.
+</p></li>
+<li class="itemize">
+<!--l. 130--><p class="indent" >
+We demonstrate these interpreters running “backwards”
+(generating input expressions from the expected output),
+and show how the interpreters supporting <span 
+class="cmti-9">list </span>and <span 
+class="cmbx-9">quote</span>
+can be used to trivially generate quines (section <a 
+href="#x1-110005">5<!--tex4ht:ref: sec:quine-generation --></a> and
+appendix <a 
+href="#x1-15000A">A<!--tex4ht:ref: extendedinterpreter --></a>).
+</p></li>
+<li class="itemize">
+<!--l. 135--><p class="indent" >We provide a complete, concise, and easily modifiable
+implementation of core miniKanren extended with <!--l. 2--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><mo 
+class="MathClass-rel" stretchy="false">≢</mo></math>,
+<span 
+class="cmti-9">symbol</span><!--l. 2--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><mspace width="0.17em" class="thinspace"/><mi 
+>o</mi> </math>,
+<span 
+class="cmti-9">number</span><!--l. 2--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><mspace width="0.17em" class="thinspace"/><mi 
+>o</mi> </math>,
+and <span 
+class="cmti-9">absent</span><!--l. 2--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><mspace width="0.17em" class="thinspace"/><mi 
+>o</mi> </math>
+constraints (appendix <a 
+href="#x1-21000D">D<!--tex4ht:ref: mkimplementationsection --></a>).
+</p></li>
+<li class="itemize">
+<!--l. 139--><p class="indent" >We                           provide                           a
+generalized version of the <span 
+class="cmbx-9">pmatch </span>pattern matcher first
+presented in <span class="cite"><a 
+href="#Xalphamk">Byrd  and  Friedman</a></span> (<span class="cite"><a 
+href="#Xalphamk">2007</a></span>);  the  updated
+<span 
+class="cmbx-9">pmatch</span>, now  called  <span 
+class="cmbx-9">dmatch </span>(appendix <a 
+href="#x1-20000C">C<!--tex4ht:ref: sec:dmatch --></a>),  is  based       on  Dijkstra  guards  (<span class="cite"><a 
+href="#XDijkstra:1975:GCN:360933.360975">Dijkstra</a></span> <span class="cite"><a 
+href="#XDijkstra:1975:GCN:360933.360975">1975</a></span>).  This  generalized
+                                       pattern  matcher  properly  handles  <span 
+class="cmbx-9">quote </span>expressions,
+                                       which is important when writing evaluators, inferencers,
+                                       and reducers.</p></li></ul>
+                                     <!--l. 150--><p class="indent" >    We begin by introducing the extended miniKanren language
+                                     we will use to write the relational interpreters.
+                                     </p>
+                                       <h3 class="sectionHead"><span class="titlemark">2.   </span> <a 
+ id="x1-60002"></a>The Extended miniKanren Language</h3>
+                                     <!--l. 4--><p class="noindent" >In this section we briefly review the core miniKanren
+                                     language (section <a 
+href="#x1-70002.1">2.1<!--tex4ht:ref: mkreferesher --></a>), then introduce the
+                                     <!--l. 6--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><mo 
+class="MathClass-rel" stretchy="false">≢</mo></math>,
+                                     <span 
+class="cmti-9">symbol</span><!--l. 9--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><mspace width="0.17em" class="thinspace"/><mi 
+>o</mi></math>,
+                                     <span 
+class="cmti-9">number</span><!--l. 11--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><mspace width="0.17em" class="thinspace"/><mi 
+>o</mi></math>,
+                                     and <span 
+class="cmti-9">absent</span><!--l. 14--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><mspace width="0.17em" class="thinspace"/><mi 
+>o</mi></math>
+                                     constraints used in the relational interpreters (section <a 
+href="#x1-80002.2">2.2<!--tex4ht:ref: mknew --></a>).
+                                     Readers already familiar with miniKanren can safely skip
+                                     to section <a 
+href="#x1-80002.2">2.2<!--tex4ht:ref: mknew --></a> to learn about the new constraints, while
+                                     those wishing to learn more about miniKanren should see
+                                     <span class="cite"><a 
+href="#Xbyrdthesis">Byrd</a></span> (<span class="cite"><a 
+href="#Xbyrdthesis">2009</a></span>), <span class="cite"><a 
+href="#XByrd:2006fk">Byrd and Friedman</a></span> (<span class="cite"><a 
+href="#XByrd:2006fk">2006</a></span>) (from which this
+                                     subsection has been adapted), and <span class="cite"><a 
+href="#Xreasoned">Friedman et al.</a></span> (<span class="cite"><a 
+href="#Xreasoned">2005</a></span>).
+                                     </p><!--l. 22--><p class="noindent" >
+                                     </p>
+                                       <h4 class="subsectionHead"><span class="titlemark">2.1   </span> <a 
+ id="x1-70002.1"></a>miniKanren Refresher</h4>
+                                     <!--l. 24--><p class="noindent" >Our code uses the following typographic conventions. Lexical variables
+                                     are in <span 
+class="cmti-9">italic</span>, forms are in <span 
+class="cmbx-9">boldface</span>, and quoted symbols are in <span 
+class="cmss-9">sans</span>
+                                     <span 
+class="cmss-9">serif</span>. By our convention, names of relations end with a superscript
+                                     <!--l. 29--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><mi 
+>o</mi></math>—for example
+                                     <span 
+class="cmti-9">any</span><!--l. 30--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><mspace width="0.17em" class="thinspace"/><mi 
+>o</mi></math>, which is
+                                     entered as <span 
+class="cmtt-9">anyo</span>. Some relational operators do not follow this convention:
+                                     <!--l. 34--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" > <mo 
+class="MathClass-rel" stretchy="false">≡</mo></math> (entered as
+                                     <span 
+class="cmtt-9">==</span>), <span 
+class="cmbx-9">cond</span><!--l. 36--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><mi 
+>e</mi></math>
+                                     (entered as <span 
+class="cmtt-9">conde</span>), and <span 
+class="cmbx-9">fresh</span>. Similarly,
+                                     (<span 
+class="cmbx-9">run</span><!--l. 43--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><mi mathvariant="bold">5</mi></math> (<span 
+class="cmti-9">q</span>) <span 
+class="cmti-9">body</span>)
+                                     and (<span 
+class="cmbx-9">run</span><!--l. 45--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><mo 
+class="MathClass-bin" stretchy="false">∗</mo></math> (<span 
+class="cmti-9">q</span>) <span 
+class="cmti-9">body</span>)
+                                     are entered as <span 
+class="cmtt-9">(run 5 (q) body)</span> and
+                                     <span 
+class="cmtt-9">(run* (q) body)</span>.<span class="footnote-mark"><a 
+href="quines3.html#fn2x0"><sup class="textsuperscript">2</sup></a></span><a 
+ id="x1-7001f2"></a> 
+                                     </p><!--l. 57--><p class="indent" >  Core miniKanren extends Scheme with three operators:
+                                     <!--l. 58--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" > <mo 
+class="MathClass-rel" stretchy="false">≡</mo></math>, <span 
+class="cmbx-9">fresh</span>,
+                                     and <span 
+class="cmbx-9">cond</span><!--l. 63--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><mi 
+>e</mi></math>.
+                                     (Four additional constraint operators are introduced in
+                                     section <a 
+href="#x1-80002.2">2.2<!--tex4ht:ref: mknew --></a>.) There is also <span 
+class="cmbx-9">run</span>, which serves as an interface
+                                     between Scheme and miniKanren, and whose value is a
+                                     list.
+                                     </p><!--l. 72--><p class="indent" >  <!--l. 72--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" > <mo 
+class="MathClass-rel" stretchy="false">≡</mo></math>
+                                     unifies two terms. <span 
+class="cmbx-9">fresh</span>, which syntactically looks like <span 
+class="cmbx-9">lambda</span>,
+                                     introduces lexically-scoped Scheme variables that are bound to
+                                     new logic variables; <span 
+class="cmbx-9">fresh </span>also performs conjunction of the
+                                     relations within its body. Thus
+                                     </p><!--l. 84--><p class="noindent" >(<span 
+class="cmbx-9">fresh </span>(<span 
+class="cmti-9">x y z</span>) (<!--l. 85--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" > <mo 
+class="MathClass-rel" stretchy="false">≡</mo></math>
+
+<span 
+class="cmti-9">x z</span>) (<!--l. 85--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" > <mo 
+class="MathClass-rel" stretchy="false">≡</mo></math>
+<span 
+class="cmss-9">3 </span><span 
+class="cmti-9">y</span>))
+</p><!--l. 90--><p class="noindent" >would introduce logic variables <span 
+class="cmti-9">x</span>, <span 
+class="cmti-9">y</span>, and <span 
+class="cmti-9">z</span>, then associate
+<span 
+class="cmti-9">x </span>with <span 
+class="cmti-9">z </span>and <span 
+class="cmti-9">y </span>with <span 
+class="cmss-9">3</span>. This, however, is not a legal
+miniKanren program—we must wrap a <span 
+class="cmbx-9">run </span>around the entire
+expression.
+</p><!--l. 113--><p class="noindent" >(<span 
+class="cmbx-9">run</span><!--l. 114--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><mi mathvariant="bold">1 </mi></math> (<span 
+class="cmti-9">q</span>)
+(<span 
+class="cmbx-9">fresh </span>(<span 
+class="cmti-9">x y z</span>) (<!--l. 114--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" > <mo 
+class="MathClass-rel" stretchy="false">≡</mo></math>
+<span 
+class="cmti-9">x z</span>) (<!--l. 114--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" > <mo 
+class="MathClass-rel" stretchy="false">≡</mo></math>
+<span 
+class="cmss-9">3 </span><span 
+class="cmti-9">y</span>))) <!--l. 115--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" > <mo 
+class="MathClass-rel" stretchy="false">⇒</mo></math>
+(<span 
+class="cmss-9">_</span><!--l. 116--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><msub><mrow 
+></mrow><mrow 
+><msub><mrow 
+></mrow><mrow 
+><mn>0</mn> </mrow> </msub 
+> </mrow> </msub 
+> </math>)
+</p><!--l. 121--><p class="noindent" >The value returned is a list containing the single value
+<span 
+class="cmss-9">_</span><!--l. 123--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><msub><mrow 
+></mrow><mrow 
+><msub><mrow 
+></mrow><mrow 
+><mn>0</mn> </mrow> </msub 
+> </mrow> </msub 
+> </math>; we say
+that <span 
+class="cmss-9">_</span><!--l. 126--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><msub><mrow 
+></mrow><mrow 
+><msub><mrow 
+></mrow><mrow 
+><mn>0</mn> </mrow> </msub 
+> </mrow> </msub 
+> </math>
+is the <span 
+class="cmti-9">reified value </span>of the unbound query variable <span 
+class="cmti-9">q </span>and thus
+represents any value. <span 
+class="cmti-9">q </span>also remains unbound in
+</p><!--l. 137--><p class="noindent" >(<span 
+class="cmbx-9">run</span><!--l. 138--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><mi mathvariant="bold">1 </mi></math> (<span 
+class="cmti-9">q</span>)
+(<span 
+class="cmbx-9">fresh </span>(<span 
+class="cmti-9">x y</span>) (<!--l. 138--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" > <mo 
+class="MathClass-rel" stretchy="false">≡</mo></math>
+<span 
+class="cmti-9">x q</span>) (<!--l. 138--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" > <mo 
+class="MathClass-rel" stretchy="false">≡</mo></math>
+<span 
+class="cmss-9">3 </span><span 
+class="cmti-9">y</span>))) <!--l. 139--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" > <mo 
+class="MathClass-rel" stretchy="false">⇒</mo></math>
+(<span 
+class="cmss-9">_</span><!--l. 140--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><msub><mrow 
+></mrow><mrow 
+><msub><mrow 
+></mrow><mrow 
+><mn>0</mn> </mrow> </msub 
+> </mrow> </msub 
+> </math>)
+</p><!--l. 145--><p class="indent" >We can get back more interesting values by unifying the
+query variable with another term.
+</p><!--l. 149--><p class="indent" >(<span 
+class="cmbx-9">run</span><!--l. 151--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><mi mathvariant="bold">1 </mi></math> (<span 
+class="cmti-9">y</span>)
+  (<span 
+class="cmbx-9">fresh </span>(<span 
+class="cmti-9">x z</span>)
+    (<!--l. 153--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" > <mo 
+class="MathClass-rel" stretchy="false">≡</mo></math><span 
+class="cmti-9">x z</span>)
+    (<!--l. 154--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" > <mo 
+class="MathClass-rel" stretchy="false">≡</mo></math><span 
+class="cmss-9">3 </span><span 
+class="cmti-9">y</span>)))
+<!--l. 155--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><mspace width="0.33em" class="nbsp" /></math>
+(<span 
+class="cmbx-9">run</span><!--l. 158--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><mi mathvariant="bold">1 </mi></math> (<span 
+class="cmti-9">q</span>)
+(<span 
+class="cmbx-9">fresh </span>(<span 
+class="cmti-9">x z</span>)
+(<!--l. 160--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" > <mo 
+class="MathClass-rel" stretchy="false">≡</mo></math><span 
+class="cmti-9">x z</span>)
+(<!--l. 161--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" > <mo 
+class="MathClass-rel" stretchy="false">≡</mo></math><span 
+class="cmss-9">3 </span><span 
+class="cmti-9">z</span>)
+(<!--l. 162--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" > <mo 
+class="MathClass-rel" stretchy="false">≡</mo></math><span 
+class="cmti-9">q x</span>)))
+(<span 
+class="cmbx-9">run</span><!--l. 165--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><mi mathvariant="bold">1 </mi></math> (<span 
+class="cmti-9">y</span>)
+(<span 
+class="cmbx-9">fresh </span>(<span 
+class="cmti-9">x y</span>)
+(<!--l. 167--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" > <mo 
+class="MathClass-rel" stretchy="false">≡</mo></math><span 
+class="cmss-9">4 </span><span 
+class="cmti-9">x</span>)
+(<!--l. 168--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" > <mo 
+class="MathClass-rel" stretchy="false">≡</mo></math><span 
+class="cmti-9">x y</span>))
+(<!--l. 169--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" > <mo 
+class="MathClass-rel" stretchy="false">≡</mo></math><span 
+class="cmss-9">3 </span><span 
+class="cmti-9">y</span>))
+</p><!--l. 174--><p class="noindent" >Each of these examples returns (<span 
+class="cmss-9">3</span>); in the rightmost example,
+the <span 
+class="cmti-9">y </span>introduced by <span 
+class="cmbx-9">fresh </span>is different from the <span 
+class="cmti-9">y </span>introduced by
+<span 
+class="cmbx-9">run</span>.
+</p><!--l. 188--><p class="indent" >A <span 
+class="cmbx-9">run </span>expression can return the empty list, indicating that
+the body of the expression is logically inconsistent.
+</p><!--l. 195--><p class="noindent" >(<span 
+class="cmbx-9">run</span><!--l. 196--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><mi mathvariant="bold">1 </mi></math>
+(<span 
+class="cmti-9">x</span>) (<!--l. 196--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" > <mo 
+class="MathClass-rel" stretchy="false">≡</mo></math><span 
+class="cmss-9">4</span>
+<span 
+class="cmss-9">3</span>)) <!--l. 197--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" > <mo 
+class="MathClass-rel" stretchy="false">⇒</mo></math>
+()
+</p><!--l. 203--><p class="noindent" >(<span 
+class="cmbx-9">run</span><!--l. 204--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><mi mathvariant="bold">1 </mi></math>
+(<span 
+class="cmti-9">x</span>) (<!--l. 204--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" > <mo 
+class="MathClass-rel" stretchy="false">≡</mo></math><span 
+class="cmss-9">5</span>
+<span 
+class="cmti-9">x</span>) (<!--l. 204--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" > <mo 
+class="MathClass-rel" stretchy="false">≡</mo></math><span 
+class="cmss-9">6</span>
+<span 
+class="cmti-9">x</span>)) <!--l. 205--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" > <mo 
+class="MathClass-rel" stretchy="false">⇒</mo></math>
+()
+</p><!--l. 211--><p class="noindent" >We say that a logically inconsistent relation
+<span 
+class="cmti-9">fails</span>, while a logically consistent relation, such as
+(<!--l. 214--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" > <mo 
+class="MathClass-rel" stretchy="false">≡</mo></math><span 
+class="cmss-9">3 3</span>),
+<span 
+class="cmti-9">succeeds</span>.
+</p><!--l. 217--><p class="indent" ><span 
+class="cmbx-9">cond</span><!--l. 217--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><mi 
+>e</mi> </math>,
+which resembles <span 
+class="cmbx-9">cond </span>syntactically, is used to produce multiple answers.
+Logically, <span 
+class="cmbx-9">cond</span><!--l. 222--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><mi 
+>e</mi></math>
+can be thought of as disjunctive normal form: each clause      represents a disjunct, and is independent of the other clauses,
+                                     with the relations within a clause acting as the conjuncts. For
+                                     example, this expression produces two answers.
+                                     </p><!--l. 229--><p class="indent" >
+
+(<span 
+class="cmbx-9">run</span><!--l. 232--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><mi mathvariant="bold">2 </mi></math> (<span 
+class="cmti-9">q</span>)
+(<span 
+class="cmbx-9">fresh </span>(<span 
+class="cmti-9">w x y</span>)
+(<span 
+class="cmbx-9">cond</span><!--l. 234--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><mi 
+>e</mi> </math>
+((<!--l. 235--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" > <mo 
+class="MathClass-rel" stretchy="false">≡</mo></math> ‘(,<span 
+class="cmti-9">x </span>,<span 
+class="cmti-9">w </span>,<span 
+class="cmti-9">x</span>) <span 
+class="cmti-9">q</span>)
+(<!--l. 236--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" > <mo 
+class="MathClass-rel" stretchy="false">≡</mo></math><span 
+class="cmti-9">y w</span>))
+((<!--l. 237--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" > <mo 
+class="MathClass-rel" stretchy="false">≡</mo></math> ‘(,<span 
+class="cmti-9">w </span>,<span 
+class="cmti-9">x </span>,<span 
+class="cmti-9">w</span>) <span 
+class="cmti-9">q</span>)
+(<!--l. 238--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" > <mo 
+class="MathClass-rel" stretchy="false">≡</mo></math><span 
+class="cmti-9">y w</span>))))) <!--l. 238--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" > <mo 
+class="MathClass-rel" stretchy="false">⇒</mo></math> ((<span 
+class="cmti-9">_</span><!--l. 238--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><msub><mrow 
+></mrow><mrow 
+><msub><mrow 
+></mrow><mrow 
+><mn>0</mn></mrow></msub 
+></mrow></msub 
+></math> <span 
+class="cmti-9">_</span><!--l. 238--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><msub><mrow 
+></mrow><mrow 
+><msub><mrow 
+></mrow><mrow 
+><mn>1</mn></mrow></msub 
+></mrow></msub 
+></math> <span 
+class="cmti-9">_</span><!--l. 238--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><msub><mrow 
+></mrow><mrow 
+><msub><mrow 
+></mrow><mrow 
+><mn>0</mn></mrow></msub 
+></mrow></msub 
+></math>) (<span 
+class="cmti-9">_</span><!--l. 238--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><msub><mrow 
+></mrow><mrow 
+><msub><mrow 
+></mrow><mrow 
+><mn>0</mn></mrow></msub 
+></mrow></msub 
+></math> <span 
+class="cmti-9">_</span><!--l. 238--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><msub><mrow 
+></mrow><mrow 
+><msub><mrow 
+></mrow><mrow 
+><mn>1</mn></mrow></msub 
+></mrow></msub 
+></math> <span 
+class="cmti-9">_</span><!--l. 238--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><msub><mrow 
+></mrow><mrow 
+><msub><mrow 
+></mrow><mrow 
+><mn>0</mn></mrow></msub 
+></mrow></msub 
+></math>))
+</p><!--l. 243--><p class="noindent" >Although the two <span 
+class="cmbx-9">cond</span><!--l. 244--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><mi 
+>e</mi></math>
+lines are different, the values returned are identical. This is because
+distinct reified unbound variables are assigned distinct subscripts,
+increasing from left to right—the numbering starts over again from
+zero within each answer, which is why the reified value of <span 
+class="cmti-9">x </span>is
+<span 
+class="cmss-9">_</span><!--l. 253--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><msub><mrow 
+></mrow><mrow 
+><msub><mrow 
+></mrow><mrow 
+><mn>0</mn> </mrow> </msub 
+> </mrow> </msub 
+> </math> in the first
+answer but <span 
+class="cmss-9">_</span><!--l. 257--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><msub><mrow 
+></mrow><mrow 
+><msub><mrow 
+></mrow><mrow 
+><mn>1</mn> </mrow> </msub 
+> </mrow> </msub 
+> </math>
+in the second. The superscript <span 
+class="cmss-9">2 </span>in <span 
+class="cmbx-9">run </span>denotes the
+maximum length of the resultant list. If the superscript
+<!--l. 265--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><mo 
+class="MathClass-bin" stretchy="false">∗</mo></math> is
+used, then there is no maximum imposed. This can easily lead
+to infinite loops.
+(<span 
+class="cmbx-9">run</span><!--l. 273--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><mo 
+class="MathClass-bin" stretchy="false">∗</mo> </math> (<span 
+class="cmti-9">q</span>)
+(<span 
+class="cmbx-9">let </span><span 
+class="cmti-9">loop </span>()
+(<span 
+class="cmbx-9">cond</span><!--l. 275--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><mi 
+>e</mi> </math>
+((<!--l. 276--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" > <mo 
+class="MathClass-rel" stretchy="false">≡</mo></math><span 
+class="cmtt-9">#</span><span 
+class="cmss-9">f </span><span 
+class="cmti-9">q</span>))
+((<!--l. 277--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" > <mo 
+class="MathClass-rel" stretchy="false">≡</mo></math><span 
+class="cmtt-9">#</span><span 
+class="cmss-9">t </span><span 
+class="cmti-9">q</span>))
+((<span 
+class="cmti-9">loop</span>))))) <!--l. 278--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" > <mo 
+class="MathClass-rel" stretchy="false">⇒</mo></math><!--l. 278--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><mo 
+class="MathClass-rel" stretchy="false">⊥</mo></math>
+</p><!--l. 283--><p class="noindent" >If we replace <!--l. 284--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><mo 
+class="MathClass-bin" stretchy="false">∗</mo></math>
+by a natural number <span 
+class="cmti-9">n</span>, then an <span 
+class="cmti-9">n</span>-element list of alternating <span 
+class="cmtt-9">#</span><span 
+class="cmss-9">f</span>’s
+and <span 
+class="cmtt-9">#</span><span 
+class="cmss-9">t</span>’s is returned. The first answer is produced by the first
+<span 
+class="cmbx-9">cond</span><!--l. 297--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><mi 
+>e</mi> </math> clause,
+which associates <span 
+class="cmti-9">q </span>with <span 
+class="cmtt-9">#</span><span 
+class="cmss-9">f</span>. To produce the second answer, the second
+<span 
+class="cmbx-9">cond</span><!--l. 304--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><mi 
+>e</mi> </math> clause is
+tried. Since <span 
+class="cmbx-9">cond</span><!--l. 307--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><mi 
+>e</mi></math>
+clauses are independent, the association between <span 
+class="cmti-9">q </span>and <span 
+class="cmtt-9">#</span><span 
+class="cmss-9">f </span>made in the
+first clause is forgotten—we say that <span 
+class="cmti-9">q </span>has been <span 
+class="cmti-9">refreshed</span>. In the third
+<span 
+class="cmbx-9">cond</span><!--l. 317--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><mi 
+>e</mi> </math>
+clause, <span 
+class="cmti-9">q </span>is refreshed again.
+</p><!--l. 323--><p class="indent" >We now look at several interesting examples that rely on
+<span 
+class="cmti-9">any</span><!--l. 324--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><mspace width="0.17em" class="thinspace"/><mi 
+>o</mi> </math>,
+which tries <span 
+class="cmti-9">g </span>an unbounded number of times.
+(<span 
+class="cmbx-9">define </span><span 
+class="cmti-9">any</span><!--l. 333--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><mspace width="0.17em" class="thinspace"/><mi 
+>o</mi> </math>
+(<span 
+class="cmbx-9">lambda </span>(<span 
+class="cmti-9">g</span>)
+(<span 
+class="cmbx-9">cond</span><!--l. 335--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><mi 
+>e</mi> </math>
+(<span 
+class="cmti-9">g</span>)
+((<span 
+class="cmti-9">any</span><!--l. 337--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><mspace width="0.17em" class="thinspace"/><mi 
+>o</mi> </math> <span 
+class="cmti-9">g</span>)))))
+</p><!--l. 342--><p class="indent" >Consider the first example,
+(<span 
+class="cmbx-9">run</span><!--l. 347--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><mo 
+class="MathClass-bin" stretchy="false">∗</mo> </math> (<span 
+class="cmti-9">q</span>)
+(<span 
+class="cmbx-9">cond</span><!--l. 348--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><mi 
+>e</mi> </math>
+((<span 
+class="cmti-9">any</span><!--l. 349--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><mspace width="0.17em" class="thinspace"/><mi 
+>o</mi> </math> (<!--l. 349--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" > <mo 
+class="MathClass-rel" stretchy="false">≡</mo></math><span 
+class="cmtt-9">#</span><span 
+class="cmss-9">f </span><span 
+class="cmti-9">q</span>)))
+((<!--l. 350--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" > <mo 
+class="MathClass-rel" stretchy="false">≡</mo></math><span 
+class="cmtt-9">#</span><span 
+class="cmss-9">t </span><span 
+class="cmti-9">q</span>))))
+</p><!--l. 355--><p class="noindent" >which does not terminate because the call to
+<span 
+class="cmti-9">any</span><!--l. 356--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><mspace width="0.17em" class="thinspace"/><mi 
+>o</mi> </math>
+succeeds an unbounded number of times. If
+<!--l. 359--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><mo 
+class="MathClass-bin" stretchy="false">∗</mo></math>
+were replaced by <span 
+class="cmss-9">5</span>, then we would get (<span 
+class="cmtt-9">#</span><span 
+class="cmss-9">t </span><span 
+class="cmtt-9">#</span><span 
+class="cmss-9">f </span><span 
+class="cmtt-9">#</span><span 
+class="cmss-9">f </span><span 
+class="cmtt-9">#</span><span 
+class="cmss-9">f </span><span 
+class="cmtt-9">#</span><span 
+class="cmss-9">f</span>). (The user
+should not be concerned with the order of the answers
+produced.)
+</p><!--l. 368--><p class="indent" >Now consider
+(<span 
+class="cmbx-9">run</span><!--l. 373--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><mi mathvariant="bold">10 </mi></math> (<span 
+class="cmti-9">q</span>)
+(<span 
+class="cmti-9">any</span><!--l. 374--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><mspace width="0.17em" class="thinspace"/><mi 
+>o</mi> </math>   (<span 
+class="cmbx-9">cond</span><!--l. 375--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><mi 
+>e</mi></math>
+                                          ((<!--l. 376--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" > <mo 
+class="MathClass-rel" stretchy="false">≡</mo></math><span 
+class="cmss-9">1 </span><span 
+class="cmti-9">q</span>))
+                                          ((<!--l. 377--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" > <mo 
+class="MathClass-rel" stretchy="false">≡</mo></math><span 
+class="cmss-9">2 </span><span 
+class="cmti-9">q</span>))
+                                          ((<!--l. 378--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" > <mo 
+class="MathClass-rel" stretchy="false">≡</mo></math><span 
+class="cmss-9">3 </span><span 
+class="cmti-9">q</span>))))) <!--l. 378--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" > <mo 
+class="MathClass-rel" stretchy="false">⇒</mo></math> (<span 
+class="cmss-9">1 2 3 1 2 3 1 2 3 1</span>)
+                                     </p><!--l. 383--><p class="noindent" >Here the values <span 
+class="cmss-9">1</span>, <span 
+class="cmss-9">2</span>, and <span 
+class="cmss-9">3 </span>are interleaved; our use of
+                                     <span 
+class="cmti-9">any</span><!--l. 391--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><mspace width="0.17em" class="thinspace"/><mi 
+>o</mi></math>
+                                     ensures that this sequence is repeated indefinitely.
+                                     </p><!--l. 395--><p class="indent" >  Even if a relation within a
+                                     <span 
+class="cmbx-9">cond</span><!--l. 396--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><mi 
+>e</mi></math>
+                                     clause loops indefinitely (or <span 
+class="cmti-9">diverges</span>), other
+                                     <span 
+class="cmbx-9">cond</span><!--l. 399--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><mi 
+>e</mi></math>
+                                     clauses can contribute to the answers returned by a <span 
+class="cmbx-9">run</span>
+                                     expression. For example,
+                                     (<span 
+class="cmbx-9">run</span><!--l. 409--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><mi mathvariant="bold">3</mi></math> (<span 
+class="cmti-9">q</span>)
+                                      (<span 
+class="cmbx-9">let </span>((<span 
+class="cmti-9">never</span><!--l. 410--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><mspace width="0.17em" class="thinspace"/><mi 
+>o</mi></math> (<span 
+class="cmti-9">any</span><!--l. 410--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><mspace width="0.17em" class="thinspace"/><mi 
+>o</mi></math> (<!--l. 410--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" > <mo 
+class="MathClass-rel" stretchy="false">≡</mo></math><span 
+class="cmtt-9">#</span><span 
+class="cmss-9">f </span><span 
+class="cmtt-9">#</span><span 
+class="cmss-9">t</span>))))
+                                        (<span 
+class="cmbx-9">cond</span><!--l. 411--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><mi 
+>e</mi></math>
+                                          ((<!--l. 412--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" > <mo 
+class="MathClass-rel" stretchy="false">≡</mo></math><span 
+class="cmss-9">1 </span><span 
+class="cmti-9">q</span>))
+                                          (<span 
+class="cmti-9">never</span><!--l. 413--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><mspace width="0.17em" class="thinspace"/><mi 
+>o</mi></math>)
+                                          ((<span 
+class="cmbx-9">cond</span><!--l. 414--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><mi 
+>e</mi></math>
+                                            ((<!--l. 415--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" > <mo 
+class="MathClass-rel" stretchy="false">≡</mo></math><span 
+class="cmss-9">2 </span><span 
+class="cmti-9">q</span>))
+                                            (<span 
+class="cmti-9">never</span><!--l. 416--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><mspace width="0.17em" class="thinspace"/><mi 
+>o</mi></math>)
+                                            ((<!--l. 417--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" > <mo 
+class="MathClass-rel" stretchy="false">≡</mo></math><span 
+class="cmss-9">3 </span><span 
+class="cmti-9">q</span>)))))))
+                                     </p><!--l. 422--><p class="noindent" >returns  (<span 
+class="cmss-9">1 2 3</span>).  Replacing
+                                     <span 
+class="cmbx-9">run</span><!--l. 426--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><mi mathvariant="bold">3</mi></math> with
+                                     <span 
+class="cmbx-9">run</span><!--l. 428--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><mi mathvariant="bold">4</mi></math> would cause
+                                     divergence, since <span 
+class="cmti-9">never</span><!--l. 430--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><mspace width="0.17em" class="thinspace"/><mi 
+>o</mi></math>
+                                     would loop indefinitely looking for the non-existent fourth
+                                     answer.
+                                     </p>
+                                       <h4 class="subsectionHead"><span class="titlemark">2.2   </span> <a 
+ id="x1-80002.2"></a>Additional Constraint Operators</h4>
+                                     <!--l. 441--><p class="noindent" >We extend core miniKanren with four constraint operators: the disequality
+                                     constraint <!--l. 443--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><mo 
+class="MathClass-rel" stretchy="false">≢</mo></math>
+                                     (previously described in the context of the cKanren constraint logic
+                                     programming framework (<span class="cite"><a 
+href="#XcKanren">Alvis et al.</a></span> <span class="cite"><a 
+href="#XcKanren">2011</a></span>)); type constraints
+                                     <span 
+class="cmti-9">symbol</span><!--l. 447--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><mspace width="0.17em" class="thinspace"/><mi 
+>o</mi></math> and
+                                     <span 
+class="cmti-9">number</span><!--l. 450--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><mspace width="0.17em" class="thinspace"/><mi 
+>o</mi></math>,
+                                     which are the miniKanren equivalent of Scheme’s
+                                     <span 
+class="cmti-9">symbol?  </span>and <span 
+class="cmti-9">number?  </span>type predicates; and
+                                     <span 
+class="cmti-9">absent</span><!--l. 459--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><mspace width="0.17em" class="thinspace"/><mi 
+>o</mi></math>,
+                                     which ensures a symbol <span 
+class="cmti-9">tag </span>does not occur in a term <span 
+class="cmti-9">t</span>.
+                                     </p><!--l. 466--><p class="indent" >  We begin with the <span 
+class="cmti-9">symbol</span><!--l. 467--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><mspace width="0.17em" class="thinspace"/><mi 
+>o</mi></math>
+                                     type constraint.
+                                     </p><!--l. 472--><p class="noindent" >(<span 
+class="cmbx-9">run</span><!--l. 473--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><mo 
+class="MathClass-bin" stretchy="false">∗</mo></math> (<span 
+class="cmti-9">q</span>)
+                                     (<span 
+class="cmti-9">symbol</span><!--l. 473--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><mspace width="0.17em" class="thinspace"/><mi 
+>o</mi></math>
+                                     <span 
+class="cmti-9">q</span>)) <!--l. 474--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" > <mo 
+class="MathClass-rel" stretchy="false">⇒</mo></math>
+                                     ((<span 
+class="cmss-9">_</span><!--l. 475--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><msub><mrow 
+></mrow><mrow 
+><msub><mrow 
+></mrow><mrow 
+><mn>0</mn></mrow></msub 
+></mrow></msub 
+></math> (<span 
+class="cmss-9">sym </span><span 
+class="cmss-9">_</span><!--l. 475--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><msub><mrow 
+></mrow><mrow 
+><msub><mrow 
+></mrow><mrow 
+><mn>0</mn></mrow></msub 
+></mrow></msub 
+></math>)))
+                                     </p><!--l. 480--><p class="noindent" >The  single  answer
+                                     (<span 
+class="cmss-9">_</span><!--l. 481--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><msub><mrow 
+></mrow><mrow 
+><msub><mrow 
+></mrow><mrow 
+><mn>0</mn></mrow></msub 
+></mrow></msub 
+></math> (<span 
+class="cmss-9">sym </span><span 
+class="cmss-9">_</span><!--l. 481--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><msub><mrow 
+></mrow><mrow 
+><msub><mrow 
+></mrow><mrow 
+><mn>0</mn></mrow></msub 
+></mrow></msub 
+></math>))
+                                     indicates that <span 
+class="cmti-9">q </span>remains unbound, and also that <span 
+class="cmti-9">q </span>represents a
+                                     symbol. Any attempt to associate <span 
+class="cmti-9">q </span>with a non-symbol value
+                                     should therefore lead to failure.
+                                     </p><!--l. 494--><p class="indent" >(<span 
+class="cmbx-9">run</span><!--l. 496--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><mo 
+class="MathClass-bin" stretchy="false">∗</mo></math> (<span 
+class="cmti-9">q</span>)
+  (<span 
+class="cmti-9">symbol</span><!--l. 497--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><mspace width="0.17em" class="thinspace"/><mi 
+>o</mi></math> <span 
+class="cmti-9">q</span>)
+  (<!--l. 498--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" > <mo 
+class="MathClass-rel" stretchy="false">≡</mo></math><span 
+class="cmss-9">4 </span><span 
+class="cmti-9">q</span>)) <!--l. 498--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" > <mo 
+class="MathClass-rel" stretchy="false">⇒</mo></math> ()
+                                                  (<span 
+class="cmbx-9">run</span><!--l. 502--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><mo 
+class="MathClass-bin" stretchy="false">∗</mo></math> (<span 
+class="cmti-9">q</span>)
+             (<span 
+class="cmti-9">symbol</span><!--l. 503--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><mspace width="0.17em" class="thinspace"/><mi 
+>o</mi></math> <span 
+class="cmti-9">q</span>)
+             (<span 
+class="cmti-9">number</span><!--l. 504--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><mspace width="0.17em" class="thinspace"/><mi 
+>o</mi></math> <span 
+class="cmti-9">q</span>)) <!--l. 504--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" > <mo 
+class="MathClass-rel" stretchy="false">⇒</mo></math> ()
+                                     </p><!--l. 509--><p class="indent" >  If we were to replace all occurrences of
+                                     <span 
+class="cmti-9">symbol</span><!--l. 510--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><mspace width="0.17em" class="thinspace"/><mi 
+>o</mi></math> by
+
+<span 
+class="cmti-9">number</span><!--l. 512--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><mspace width="0.17em" class="thinspace"/><mi 
+>o</mi> </math>
+in the three examples above, the new answers produced would be
+((<span 
+class="cmss-9">_</span><!--l. 515--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><msub><mrow 
+></mrow><mrow 
+><msub><mrow 
+></mrow><mrow 
+><mn>0</mn> </mrow> </msub 
+> </mrow> </msub 
+> </math> (<span 
+class="cmss-9">num </span><span 
+class="cmss-9">_</span><!--l. 515--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><msub><mrow 
+></mrow><mrow 
+><msub><mrow 
+></mrow><mrow 
+><mn>0</mn></mrow></msub 
+></mrow></msub 
+></math>))),
+(<span 
+class="cmss-9">4</span>), and ((<span 
+class="cmss-9">_</span><!--l. 519--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><msub><mrow 
+></mrow><mrow 
+><msub><mrow 
+></mrow><mrow 
+><mn>0</mn> </mrow> </msub 
+> </mrow> </msub 
+> </math> (<span 
+class="cmss-9">num </span><span 
+class="cmss-9">_</span><!--l. 519--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><msub><mrow 
+></mrow><mrow 
+><msub><mrow 
+></mrow><mrow 
+><mn>0</mn></mrow></msub 
+></mrow></msub 
+></math>))),
+respectively.
+</p><!--l. 522--><p class="indent" >Next we consider the disequality constraint
+<!--l. 523--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><mo 
+class="MathClass-rel" stretchy="false">≢</mo></math>.
+</p><!--l. 528--><p class="noindent" >(<span 
+class="cmbx-9">run</span><!--l. 529--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><mo 
+class="MathClass-bin" stretchy="false">∗</mo> </math>
+(<span 
+class="cmti-9">p</span>) (<!--l. 529--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><mo 
+class="MathClass-rel" stretchy="false">≢</mo> </math> <span 
+class="cmti-9">p</span>
+<span 
+class="cmss-9">1</span>)) <!--l. 530--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" > <mo 
+class="MathClass-rel" stretchy="false">⇒</mo></math>
+((<span 
+class="cmss-9">_</span><!--l. 531--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><msub><mrow 
+></mrow><mrow 
+><msub><mrow 
+></mrow><mrow 
+><mn>0</mn> </mrow> </msub 
+> </mrow> </msub 
+> </math> (<!--l. 531--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><mo 
+class="MathClass-rel" stretchy="false">≢</mo></math> ((<span 
+class="cmss-9">_</span><!--l. 531--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><msub><mrow 
+></mrow><mrow 
+><msub><mrow 
+></mrow><mrow 
+><mn>0</mn></mrow></msub 
+></mrow></msub 
+></math> <span 
+class="cmss-9">1</span>)))))
+</p><!--l. 536--><p class="noindent" >The answer states that <span 
+class="cmti-9">p </span>remains unbound, but cannot be
+associated with <span 
+class="cmss-9">1</span>. Of course, violating the constraint leads to
+failure:
+(<span 
+class="cmbx-9">run</span><!--l. 546--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><mo 
+class="MathClass-bin" stretchy="false">∗</mo> </math> (<span 
+class="cmti-9">p</span>) (<!--l. 546--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><mo 
+class="MathClass-rel" stretchy="false">≢</mo></math> <span 
+class="cmss-9">1 </span><span 
+class="cmti-9">p</span>) (<!--l. 546--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" > <mo 
+class="MathClass-rel" stretchy="false">≡</mo></math><span 
+class="cmss-9">1 </span><span 
+class="cmti-9">p</span>)) <!--l. 546--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" > <mo 
+class="MathClass-rel" stretchy="false">⇒</mo></math> ()
+</p><!--l. 551--><p class="indent" >A slightly more complicated example is a disequality
+constraint between two lists.
+(<span 
+class="cmbx-9">run</span><!--l. 556--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><mo 
+class="MathClass-bin" stretchy="false">∗</mo> </math> (<span 
+class="cmti-9">q</span>)
+(<span 
+class="cmbx-9">fresh </span>(<span 
+class="cmti-9">p r</span>)
+(<!--l. 558--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><mo 
+class="MathClass-rel" stretchy="false">≢</mo> </math> ’(<span 
+class="cmss-9">1 2</span>) ‘(,<span 
+class="cmti-9">p </span>,<span 
+class="cmti-9">r</span>))
+(<!--l. 559--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" > <mo 
+class="MathClass-rel" stretchy="false">≡</mo></math> ‘(,<span 
+class="cmti-9">p </span>,<span 
+class="cmti-9">r</span>) <span 
+class="cmti-9">q</span>))) <!--l. 559--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" > <mo 
+class="MathClass-rel" stretchy="false">⇒</mo></math> (((<span 
+class="cmti-9">_</span><!--l. 559--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><msub><mrow 
+></mrow><mrow 
+><msub><mrow 
+></mrow><mrow 
+><mn>0</mn></mrow></msub 
+></mrow></msub 
+></math> <span 
+class="cmti-9">_</span><!--l. 559--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><msub><mrow 
+></mrow><mrow 
+><msub><mrow 
+></mrow><mrow 
+><mn>1</mn></mrow></msub 
+></mrow></msub 
+></math>) (<!--l. 559--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><mo 
+class="MathClass-rel" stretchy="false">≢</mo></math> ((<span 
+class="cmti-9">_</span><!--l. 559--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><msub><mrow 
+></mrow><mrow 
+><msub><mrow 
+></mrow><mrow 
+><mn>0</mn></mrow></msub 
+></mrow></msub 
+></math> <span 
+class="cmss-9">1</span>) (<span 
+class="cmti-9">_</span><!--l. 559--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><msub><mrow 
+></mrow><mrow 
+><msub><mrow 
+></mrow><mrow 
+><mn>1</mn></mrow></msub 
+></mrow></msub 
+></math> <span 
+class="cmss-9">2</span>)))))
+</p><!--l. 564--><p class="noindent" >The answer states that <span 
+class="cmti-9">p </span>and <span 
+class="cmti-9">r </span>are unbound, and that <span 
+class="cmti-9">p </span>cannot
+be associated with <span 
+class="cmss-9">1 </span>while <span 
+class="cmti-9">r </span>is associated with <span 
+class="cmss-9">2 </span>(and the other
+way around). We would get the same answer if we were to replace
+(<!--l. 583--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><mo 
+class="MathClass-rel" stretchy="false">≢</mo> </math> ’(<span 
+class="cmss-9">1 2</span>) ‘(,<span 
+class="cmti-9">p </span>,<span 
+class="cmti-9">r</span>)) by either
+(<!--l. 586--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><mo 
+class="MathClass-rel" stretchy="false">≢</mo> </math> ’((<span 
+class="cmss-9">1</span>) (<span 
+class="cmss-9">2</span>)) ‘((,<span 
+class="cmti-9">p</span>) (,<span 
+class="cmti-9">r</span>))) or
+(<!--l. 590--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><mo 
+class="MathClass-rel" stretchy="false">≢</mo> </math> ‘((<span 
+class="cmss-9">1</span>) (,<span 
+class="cmti-9">r</span>)) ‘((,<span 
+class="cmti-9">p</span>) (<span 
+class="cmss-9">2</span>))).
+</p><!--l. 592--><p class="indent" >Now consider the <span 
+class="cmbx-9">run </span>expression
+(<span 
+class="cmbx-9">run</span><!--l. 599--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><mo 
+class="MathClass-bin" stretchy="false">∗</mo> </math> (<span 
+class="cmti-9">q</span>)
+(<span 
+class="cmbx-9">fresh </span>(<span 
+class="cmti-9">p r</span>)
+(<!--l. 601--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><mo 
+class="MathClass-rel" stretchy="false">≢</mo> </math> ’(<span 
+class="cmss-9">1 2</span>) ‘(,<span 
+class="cmti-9">p </span>,<span 
+class="cmti-9">r</span>))
+(<!--l. 602--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" > <mo 
+class="MathClass-rel" stretchy="false">≡</mo></math><span 
+class="cmss-9">1 </span><span 
+class="cmti-9">p</span>)
+(<!--l. 603--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" > <mo 
+class="MathClass-rel" stretchy="false">≡</mo></math> ‘(,<span 
+class="cmti-9">p </span>,<span 
+class="cmti-9">r</span>) <span 
+class="cmti-9">q</span>))) <!--l. 603--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" > <mo 
+class="MathClass-rel" stretchy="false">⇒</mo></math> (((<span 
+class="cmss-9">1 </span><span 
+class="cmti-9">_</span><!--l. 603--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><msub><mrow 
+></mrow><mrow 
+><msub><mrow 
+></mrow><mrow 
+><mn>0</mn></mrow></msub 
+></mrow></msub 
+></math>) (<!--l. 603--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><mo 
+class="MathClass-rel" stretchy="false">≢</mo></math> ((<span 
+class="cmti-9">_</span><!--l. 603--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><msub><mrow 
+></mrow><mrow 
+><msub><mrow 
+></mrow><mrow 
+><mn>0</mn></mrow></msub 
+></mrow></msub 
+></math> <span 
+class="cmss-9">2</span>)))))
+</p><!--l. 608--><p class="noindent" >If we also associate <span 
+class="cmti-9">r </span>with <span 
+class="cmss-9">2</span>, the <span 
+class="cmbx-9">run </span>expression fails.
+(<span 
+class="cmbx-9">run</span><!--l. 619--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><mo 
+class="MathClass-bin" stretchy="false">∗</mo> </math> (<span 
+class="cmti-9">q</span>)
+(<span 
+class="cmbx-9">fresh </span>(<span 
+class="cmti-9">p r</span>)
+(<!--l. 621--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><mo 
+class="MathClass-rel" stretchy="false">≢</mo> </math> ’(<span 
+class="cmss-9">1 2</span>) ‘(,<span 
+class="cmti-9">p </span>,<span 
+class="cmti-9">r</span>))
+(<!--l. 622--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" > <mo 
+class="MathClass-rel" stretchy="false">≡</mo></math><span 
+class="cmss-9">1 </span><span 
+class="cmti-9">p</span>)
+(<!--l. 623--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" > <mo 
+class="MathClass-rel" stretchy="false">≡</mo></math><span 
+class="cmss-9">2 </span><span 
+class="cmti-9">r</span>)
+(<!--l. 624--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" > <mo 
+class="MathClass-rel" stretchy="false">≡</mo></math> ‘(,<span 
+class="cmti-9">p </span>,<span 
+class="cmti-9">r</span>) <span 
+class="cmti-9">q</span>))) <!--l. 624--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" > <mo 
+class="MathClass-rel" stretchy="false">⇒</mo></math> ()
+</p><!--l. 629--><p class="indent" >Now consider what happens when
+(<!--l. 630--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" > <mo 
+class="MathClass-rel" stretchy="false">≡</mo></math><span 
+class="cmss-9">2 </span><span 
+class="cmti-9">r</span>) is replaced
+by (<span 
+class="cmti-9">symbol</span><!--l. 633--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><mspace width="0.17em" class="thinspace"/><mi 
+>o</mi> </math> <span 
+class="cmti-9">r</span>)
+in the previous example. Then the <span 
+class="cmbx-9">run </span>expression succeeds with the answer
+(((<span 
+class="cmss-9">1 </span><span 
+class="cmss-9">_</span><!--l. 641--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><msub><mrow 
+></mrow><mrow 
+><msub><mrow 
+></mrow><mrow 
+><mn>0</mn> </mrow> </msub 
+> </mrow> </msub 
+> </math>) (<span 
+class="cmss-9">sym </span><span 
+class="cmss-9">_</span><!--l. 641--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><msub><mrow 
+></mrow><mrow 
+><msub><mrow 
+></mrow><mrow 
+><mn>0</mn></mrow></msub 
+></mrow></msub 
+></math>)))
+which states that <span 
+class="cmti-9">r </span>can only be associated with a symbol. The reified constraint
+(<!--l. 649--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><mo 
+class="MathClass-rel" stretchy="false">≢</mo> </math> ((<span 
+class="cmss-9">_</span><!--l. 649--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><msub><mrow 
+></mrow><mrow 
+><msub><mrow 
+></mrow><mrow 
+><mn>0</mn></mrow></msub 
+></mrow></msub 
+></math> <span 
+class="cmss-9">2</span>)))
+(stating that <span 
+class="cmti-9">r </span>cannot be associated with <span 
+class="cmss-9">2</span>) is not included in
+the answer, since it is subsumed by the constraint that <span 
+class="cmti-9">r </span>must
+be a symbol.
+</p><!--l. 662--><p class="indent" >Finally we consider <span 
+class="cmti-9">absent</span><!--l. 664--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><mspace width="0.17em" class="thinspace"/><mi 
+>o</mi></math>,
+which ensures a symbol <span 
+class="cmti-9">tag </span>does not appear in a term
+<span 
+class="cmti-9">t</span>. Assume we have a term <span 
+class="cmti-9">q </span>containing predators
+such as <span 
+class="cmss-9">jackal</span>s and <span 
+class="cmss-9">leopard</span>s, and we desire to keep
+gentle <span 
+class="cmss-9">panda</span>s out of this dangerous term. We can use
+<span 
+class="cmti-9">absent</span><!--l. 679--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><mspace width="0.17em" class="thinspace"/><mi 
+>o</mi> </math>
+to ensure that this will occur.                           (<span 
+class="cmbx-9">run</span><!--l. 685--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><mo 
+class="MathClass-bin" stretchy="false">∗</mo></math> (<span 
+class="cmti-9">q</span>)
+                                      (<span 
+class="cmbx-9">fresh </span>(<span 
+class="cmti-9">x y</span>)
+                                        (<!--l. 687--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" > <mo 
+class="MathClass-rel" stretchy="false">≡</mo></math> ‘(<span 
+class="cmss-9">jackal </span>(,<span 
+class="cmti-9">y </span><span 
+class="cmss-9">leopard </span>,<span 
+class="cmti-9">x</span>)) <span 
+class="cmti-9">q</span>)
+                                        (<span 
+class="cmti-9">absent</span><!--l. 688--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><mspace width="0.17em" class="thinspace"/><mi 
+>o</mi></math> ’<span 
+class="cmss-9">panda </span><span 
+class="cmti-9">q</span>)))
+                                     <!--l. 689--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" > <mo 
+class="MathClass-rel" stretchy="false">⇒</mo></math>
+                                  </p><!--l. 691--><p class="noindent" >(((<span 
+class="cmss-9">jackal </span>(<span 
+class="cmss-9">_</span><!--l. 692--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><msub><mrow 
+></mrow><mrow 
+><msub><mrow 
+></mrow><mrow 
+><mn>0</mn></mrow></msub 
+></mrow></msub 
+></math> <span 
+class="cmss-9">leopard </span><span 
+class="cmss-9">_</span><!--l. 692--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><msub><mrow 
+></mrow><mrow 
+><msub><mrow 
+></mrow><mrow 
+><mn>1</mn></mrow></msub 
+></mrow></msub 
+></math>))
+ (<span 
+class="cmss-9">absent panda </span><span 
+class="cmss-9">_</span><!--l. 693--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><msub><mrow 
+></mrow><mrow 
+><msub><mrow 
+></mrow><mrow 
+><mn>0</mn></mrow></msub 
+></mrow></msub 
+></math>)
+ (<span 
+class="cmss-9">absent panda </span><span 
+class="cmss-9">_</span><!--l. 694--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><msub><mrow 
+></mrow><mrow 
+><msub><mrow 
+></mrow><mrow 
+><mn>1</mn></mrow></msub 
+></mrow></msub 
+></math>)))
+                                     </p><!--l. 699--><p class="noindent" >The answer states that the two unbound variables, <span 
+class="cmti-9">x </span>and
+                                     <span 
+class="cmti-9">y</span>, cannot be associated with a term that contains the
+                                     term <span 
+class="cmss-9">panda</span>. If we violate this constraint by associating
+                                     <span 
+class="cmti-9">x </span>with <span 
+class="cmss-9">panda </span>(or with a list containing <span 
+class="cmss-9">panda</span>), the <span 
+class="cmbx-9">run</span>
+                                     expression no longer returns any answers, keeping the <span 
+class="cmss-9">panda</span>s
+                                     safe.
+                                     (<span 
+class="cmbx-9">run</span><!--l. 724--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><mo 
+class="MathClass-bin" stretchy="false">∗</mo></math> (<span 
+class="cmti-9">q</span>)
+                                      (<span 
+class="cmbx-9">fresh </span>(<span 
+class="cmti-9">x y</span>)
+                                        (<!--l. 726--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" > <mo 
+class="MathClass-rel" stretchy="false">≡</mo></math> ‘(<span 
+class="cmss-9">jackal </span>(,<span 
+class="cmti-9">y </span><span 
+class="cmss-9">leopard </span>,<span 
+class="cmti-9">x</span>)) <span 
+class="cmti-9">q</span>)
+                                        (<span 
+class="cmti-9">absent</span><!--l. 727--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><mspace width="0.17em" class="thinspace"/><mi 
+>o</mi></math> ’<span 
+class="cmss-9">panda </span><span 
+class="cmti-9">q</span>)
+                                        (<!--l. 728--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" > <mo 
+class="MathClass-rel" stretchy="false">≡</mo></math> ’<span 
+class="cmss-9">panda </span><span 
+class="cmti-9">x</span>))) <!--l. 728--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" > <mo 
+class="MathClass-rel" stretchy="false">⇒</mo></math> ()
+                                     </p><!--l. 733--><p class="noindent" >If <span 
+class="cmti-9">x  </span>is known to be a symbol, the
+                                     <span 
+class="cmti-9">absent</span><!--l. 737--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><mspace width="0.17em" class="thinspace"/><mi 
+>o</mi></math>
+                                     constraint on <span 
+class="cmti-9">x </span>can be simplified to a disequality constraint
+                                     between <span 
+class="cmti-9">x </span>and <span 
+class="cmss-9">panda</span>.
+                                     (<span 
+class="cmbx-9">run</span><!--l. 750--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><mo 
+class="MathClass-bin" stretchy="false">∗</mo></math> (<span 
+class="cmti-9">q</span>)
+                                      (<span 
+class="cmbx-9">fresh </span>(<span 
+class="cmti-9">x y</span>)
+                                        (<!--l. 752--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" > <mo 
+class="MathClass-rel" stretchy="false">≡</mo></math> ‘(<span 
+class="cmss-9">jackal </span>(,<span 
+class="cmti-9">y </span><span 
+class="cmss-9">leopard </span>,<span 
+class="cmti-9">x</span>)) <span 
+class="cmti-9">q</span>)
+                                        (<span 
+class="cmti-9">absent</span><!--l. 753--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><mspace width="0.17em" class="thinspace"/><mi 
+>o</mi></math> ’<span 
+class="cmss-9">panda </span><span 
+class="cmti-9">q</span>)
+                                        (<span 
+class="cmti-9">symbol</span><!--l. 754--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><mspace width="0.17em" class="thinspace"/><mi 
+>o</mi></math> <span 
+class="cmti-9">x</span>)))
+                                     <!--l. 755--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" > <mo 
+class="MathClass-rel" stretchy="false">⇒</mo></math>
+                                  </p><!--l. 757--><p class="noindent" >(((<span 
+class="cmss-9">jackal </span>(<span 
+class="cmss-9">_</span><!--l. 758--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><msub><mrow 
+></mrow><mrow 
+><msub><mrow 
+></mrow><mrow 
+><mn>0</mn></mrow></msub 
+></mrow></msub 
+></math> <span 
+class="cmss-9">leopard </span><span 
+class="cmss-9">_</span><!--l. 758--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><msub><mrow 
+></mrow><mrow 
+><msub><mrow 
+></mrow><mrow 
+><mn>1</mn></mrow></msub 
+></mrow></msub 
+></math>))
+ (<!--l. 759--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><mo 
+class="MathClass-rel" stretchy="false">≢</mo></math> ((<span 
+class="cmss-9">_</span><!--l. 759--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><msub><mrow 
+></mrow><mrow 
+><msub><mrow 
+></mrow><mrow 
+><mn>1</mn></mrow></msub 
+></mrow></msub 
+></math> <span 
+class="cmss-9">panda</span>)))
+ (<span 
+class="cmss-9">absent panda </span><span 
+class="cmss-9">_</span><span 
+class="cmss-9">_</span><!--l. 760--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><msub><mrow 
+></mrow><mrow 
+><msub><mrow 
+></mrow><mrow 
+><mn>0</mn></mrow></msub 
+></mrow></msub 
+></math>)
+ (<span 
+class="cmss-9">sym </span><span 
+class="cmss-9">_</span><!--l. 761--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><msub><mrow 
+></mrow><mrow 
+><msub><mrow 
+></mrow><mrow 
+><mn>1</mn></mrow></msub 
+></mrow></msub 
+></math>)))
+                                     </p><!--l. 766--><p class="noindent" >The answer still contains the full
+                                     <span 
+class="cmti-9">absent</span><!--l. 768--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><mspace width="0.17em" class="thinspace"/><mi 
+>o</mi></math>
+                                     constraint on <span 
+class="cmti-9">y</span>; violating this constraint does indeed cause
+                                     failure.
+                                     (<span 
+class="cmbx-9">run</span><!--l. 777--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><mo 
+class="MathClass-bin" stretchy="false">∗</mo></math> (<span 
+class="cmti-9">q</span>)
+                                      (<span 
+class="cmbx-9">fresh </span>(<span 
+class="cmti-9">x y z</span>)
+                                        (<!--l. 779--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" > <mo 
+class="MathClass-rel" stretchy="false">≡</mo></math> ‘(<span 
+class="cmss-9">jackal </span>(,<span 
+class="cmti-9">y </span><span 
+class="cmss-9">leopard </span>,<span 
+class="cmti-9">x</span>)) <span 
+class="cmti-9">q</span>)
+                                        (<span 
+class="cmti-9">absent</span><!--l. 780--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><mspace width="0.17em" class="thinspace"/><mi 
+>o</mi></math> ’<span 
+class="cmss-9">panda </span><span 
+class="cmti-9">q</span>)
+                                        (<span 
+class="cmti-9">symbol</span><!--l. 781--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><mspace width="0.17em" class="thinspace"/><mi 
+>o</mi></math> <span 
+class="cmti-9">x</span>)
+                                        (<!--l. 782--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" > <mo 
+class="MathClass-rel" stretchy="false">≡</mo></math> ‘(<span 
+class="cmss-9">c </span>,<span 
+class="cmti-9">z </span><span 
+class="cmss-9">d</span>) <span 
+class="cmti-9">y</span>)
+                                        (<!--l. 783--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" > <mo 
+class="MathClass-rel" stretchy="false">≡</mo></math> ’<span 
+class="cmss-9">panda </span><span 
+class="cmti-9">z</span>))) <!--l. 783--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" > <mo 
+class="MathClass-rel" stretchy="false">⇒</mo></math> ()
+                                     </p><!--l. 2--><p class="noindent" >
+                                     </p>
+                                       <h3 class="sectionHead"><span class="titlemark">3.   </span> <a 
+ id="x1-90003"></a>Translating an Interpreter from Scheme to miniKanren</h3>
+                                     <!--l. 4--><p class="noindent" >In this section we start with a standard
+                                     environment-passing interpreter for the call-by-value
+                                     <!--l. 5--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><mi 
+>λ</mi></math>-calculus,
+                                     then show how the interpreter can be translated into miniKanren
+                                     in order to run “backwards.”
+                                     </p><!--l. 9--><p class="indent" >  We begin by defining variable lookup in an environment
+                                     represented as an association list.
+                                     (<span 
+class="cmbx-9">define </span><span 
+class="cmti-9">lookup</span>
+                                      (<span 
+class="cmbx-9">lambda </span>(<span 
+class="cmti-9">x env</span>)
+
+(<span 
+class="cmbx-9">dmatch </span><span 
+class="cmti-9">env</span>
+(() (<span 
+class="cmti-9">error </span>’<span 
+class="cmss-9">lookup ”unbound variable”</span>))
+(((,<span 
+class="cmti-9">y </span>. ,<span 
+class="cmti-9">v</span>) . ,<span 
+class="cmti-9">rest</span>) (<span 
+class="cmbx-9">guard </span>(<span 
+class="cmti-9">eq? y x</span>))
+<span 
+class="cmti-9">v</span>)
+(((,<span 
+class="cmti-9">y </span>. ,<span 
+class="cmti-9">v</span>) . ,<span 
+class="cmti-9">rest</span>) (<span 
+class="cmbx-9">guard </span>(<span 
+class="cmti-9">not </span>(<span 
+class="cmti-9">eq? y x</span>)))
+(<span 
+class="cmti-9">lookup x rest</span>)))))
+</p><!--l. 26--><p class="noindent" ><span 
+class="cmti-9">lookup </span>uses <span 
+class="cmbx-9">dmatch </span>(appendix <a 
+href="#x1-20000C">C<!--tex4ht:ref: sec:dmatch --></a>), a simple pattern
+matcher with guards in the style of Dijkstra’s Guarded
+Commands (<span class="cite"><a 
+href="#XDijkstra:1975:GCN:360933.360975">Dijkstra</a></span> <span class="cite"><a 
+href="#XDijkstra:1975:GCN:360933.360975">1975</a></span>). <span 
+class="cmbx-9">dmatch </span>ensures that the
+patterns and optional guards of different clauses do not
+overlap.<span class="footnote-mark"><a 
+href="quines4.html#fn3x0"><sup class="textsuperscript">3 </sup> </a></span> <a 
+ id="x1-9001f3"></a>  
+This <span 
+class="cmti-9">non-overlapping property </span>ensures that the ordering of
+the clauses does not matter, and is required for writing
+correct relational programs (<span class="cite"><a 
+href="#Xbyrdthesis">Byrd</a></span> <span class="cite"><a 
+href="#Xbyrdthesis">2009</a></span>). By ensuring the
+non-overlapping property holds in the Scheme version of the
+interpreter, we simplify the translation to miniKanren.
+</p><!--l. 52--><p class="indent" >Now that we have defined <span 
+class="cmti-9">lookup</span>, we can write our simple
+interpreter using <span 
+class="cmbx-9">dmatch</span>.
+(<span 
+class="cmbx-9">define </span><span 
+class="cmti-9">eval-exp</span>
+(<span 
+class="cmbx-9">lambda </span>(<span 
+class="cmti-9">exp env</span>)
+(<span 
+class="cmbx-9">dmatch </span><span 
+class="cmti-9">exp</span>
+((,<span 
+class="cmti-9">rator </span>,<span 
+class="cmti-9">rand</span>)
+(<span 
+class="cmbx-9">let</span>((<span 
+class="cmti-9">proc </span>(<span 
+class="cmti-9">eval-exp rator env</span>))
+(<span 
+class="cmti-9">arg </span>(<span 
+class="cmti-9">eval-exp rand env</span>)))
+(<span 
+class="cmbx-9">dmatch </span><span 
+class="cmti-9">proc</span>
+((<span 
+class="cmss-9">closure </span>,<span 
+class="cmti-9">x </span>,<span 
+class="cmti-9">body </span>,<span 
+class="cmti-9">env</span><!--l. 69--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><msub><mrow 
+></mrow><mrow 
+><msub><mrow 
+></mrow><mrow 
+><mn>2</mn></mrow></msub 
+></mrow></msub 
+></math>)
+(<span 
+class="cmti-9">eval-exp body </span>‘((,<span 
+class="cmti-9">x </span>. ,<span 
+class="cmti-9">arg</span>) . ,<span 
+class="cmti-9">env</span><!--l. 70--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><msub><mrow 
+></mrow><mrow 
+><msub><mrow 
+></mrow><mrow 
+><mn>2</mn></mrow></msub 
+></mrow></msub 
+></math>))))))      
+((<span 
+class="cmss-9">lambda </span>(,<span 
+class="cmti-9">x</span>) ,<span 
+class="cmti-9">body</span>)
+(<span 
+class="cmbx-9">guard </span>(<span 
+class="cmti-9">symbol? x</span>) (<span 
+class="cmti-9">not-in-env? </span>’<span 
+class="cmss-9">lambda </span><span 
+class="cmti-9">env</span>))
+‘(<span 
+class="cmss-9">closure </span>,<span 
+class="cmti-9">x </span>,<span 
+class="cmti-9">body </span>,<span 
+class="cmti-9">env</span>))
+(,<span 
+class="cmti-9">x </span>(<span 
+class="cmbx-9">guard </span>(<span 
+class="cmti-9">symbol? x</span>)) (<span 
+class="cmti-9">lookup x env</span>)))))
+(<span 
+class="cmbx-9">define </span><span 
+class="cmti-9">not-in-env?</span>
+(<span 
+class="cmbx-9">lambda </span>(<span 
+class="cmti-9">x env</span>)
+(<span 
+class="cmbx-9">dmatch </span><span 
+class="cmti-9">env</span>
+(() <span 
+class="cmtt-9">#</span><span 
+class="cmss-9">t</span>)
+(((,<span 
+class="cmti-9">y </span>. ,<span 
+class="cmti-9">v</span>) . ,<span 
+class="cmti-9">rest</span>) (<span 
+class="cmbx-9">guard </span>(<span 
+class="cmti-9">eq? y x</span>)) <span 
+class="cmtt-9">#</span><span 
+class="cmss-9">f</span>)      
+(((,<span 
+class="cmti-9">y </span>. ,<span 
+class="cmti-9">v</span>) . ,<span 
+class="cmti-9">rest</span>) (<span 
+class="cmbx-9">guard </span>(<span 
+class="cmti-9">not </span>(<span 
+class="cmti-9">eq? y x</span>)))
+(<span 
+class="cmti-9">not-in-env? x rest</span>)))))
+</p><!--l. 89--><p class="indent" >The guard in <span 
+class="cmti-9">eval-exp</span>’s <span 
+class="cmss-9">lambda </span>clause includes the test
+</p><!--l. 97--><p class="noindent" >(<span 
+class="cmti-9">not-in-env? </span>’<span 
+class="cmss-9">lambda </span><span 
+class="cmti-9">env</span>)
+</p><!--l. 103--><p class="noindent" >When we extend the interpreter in section <a 
+href="#x1-100004">4<!--tex4ht:ref: sec:extending-interpreter --></a>, and again in
+appendix <a 
+href="#x1-15000A">A<!--tex4ht:ref: extendedinterpreter --></a>, we will use a similar <span 
+class="cmti-9">not-in-env? </span>test in the guard
+of every new language form and primitive operator. This use of
+<span 
+class="cmti-9">not-in-env? </span>serves two critical and related purposes. First, the
+test ensures that procedure application does not overlap with
+any other clause in the interpreter, such as the (<span 
+class="cmss-9">quote </span>,<span 
+class="cmti-9">v</span>) and
+(<span 
+class="cmss-9">list </span>. ,<span 
+class="cmti-9">a</span><!--l. 118--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><mo 
+class="MathClass-bin" stretchy="false">∗</mo> </math>)
+clauses we add in section <a 
+href="#x1-100004">4<!--tex4ht:ref: sec:extending-interpreter --></a>. Second, the test ensures that
+<span 
+class="cmti-9">eval-exp </span>will correctly evaluate expressions in which <span 
+class="cmss-9">lambda </span>(or
+<span 
+class="cmss-9">quote </span>or <span 
+class="cmss-9">list</span>) is shadowed. For example, the interpreter
+correctly handles shadowing of <span 
+class="cmss-9">lambda </span>in this definition of
+<!--l. 135--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><mi mathvariant="normal">Ω</mi></math>.
+(<span 
+class="cmbx-9">define </span><!--l. 141--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><mi mathvariant="normal">Ω</mi> </math>
+’((<span 
+class="cmss-9">lambda </span>(<span 
+class="cmss-9">lambda</span>) (<span 
+class="cmss-9">lambda lambda</span>))
+(<span 
+class="cmss-9">lambda </span>(<span 
+class="cmss-9">lambda</span>) (<span 
+class="cmss-9">lambda lambda</span>))))                  </p><!--l. 148--><p class="noindent" >As expected, <!--l. 149--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><mi mathvariant="normal">Ω</mi></math>
+                                     diverges.
+                                     (<span 
+class="cmti-9">eval-exp </span><!--l. 155--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><mi mathvariant="normal">Ω</mi></math> ’()) <!--l. 155--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" > <mo 
+class="MathClass-rel" stretchy="false">⇒</mo></math><!--l. 155--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><mo 
+class="MathClass-rel" stretchy="false">⊥</mo></math>
+                                     </p><!--l. 160--><p class="noindent" >The empty list passed as the second argument to <span 
+class="cmti-9">eval-exp</span>
+                                     represents the empty environment.
+                                     </p><!--l. 165--><p class="indent" >  Here are two more examples showing <span 
+class="cmti-9">eval-exp </span>in action:
+                                     </p><!--l. 171--><p class="indent" >(<span 
+class="cmti-9">eval-exp</span>
+  ’(((<span 
+class="cmss-9">lambda </span>(<span 
+class="cmss-9">x</span>)
+      (<span 
+class="cmss-9">lambda </span>(<span 
+class="cmss-9">y</span>) <span 
+class="cmss-9">x</span>))
+    (<span 
+class="cmss-9">lambda </span>(<span 
+class="cmss-9">z</span>) <span 
+class="cmss-9">z</span>))
+   (<span 
+class="cmss-9">lambda </span>(<span 
+class="cmss-9">a</span>) <span 
+class="cmss-9">a</span>))
+  ’())
+<!--l. 179--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" > <mo 
+class="MathClass-rel" stretchy="false">⇒</mo></math>
+<!--l. 180--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><mo 
+class="MathClass-open" stretchy="false">(</mo><mi 
+>c</mi><mi 
+>l</mi><mi 
+>o</mi><mi 
+>s</mi><mi 
+>u</mi><mi 
+>r</mi><mi 
+>e</mi> <mi 
+>z</mi> <mi 
+>z</mi> <mo 
+class="MathClass-open" stretchy="false">(</mo><mo 
+class="MathClass-close" stretchy="false">)</mo><mo 
+class="MathClass-close" stretchy="false">)</mo></math>    
+                                     (<span 
+class="cmti-9">eval-exp</span>
+                                      ’((<span 
+class="cmss-9">lambda </span>(<span 
+class="cmss-9">x</span>)
+                                         (<span 
+class="cmss-9">lambda </span>(<span 
+class="cmss-9">y</span>) <span 
+class="cmss-9">x</span>))
+                                        (<span 
+class="cmss-9">lambda </span>(<span 
+class="cmss-9">z</span>) <span 
+class="cmss-9">z</span>))
+                                       ’())
+                                     <!--l. 191--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" > <mo 
+class="MathClass-rel" stretchy="false">⇒</mo></math>
+                                     <!--l. 192--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><mo 
+class="MathClass-open" stretchy="false">(</mo><mi 
+>c</mi><mi 
+>l</mi><mi 
+>o</mi><mi 
+>s</mi><mi 
+>u</mi><mi 
+>r</mi><mi 
+>e</mi> <mi 
+>y</mi> <mi 
+>x</mi></math>  
+                                     <!--l. 195--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><mspace width="0.33em" class="nbsp" /><mspace width="0.33em" class="nbsp" /><mo 
+class="MathClass-open" stretchy="false">(</mo><mo 
+class="MathClass-open" stretchy="false">(</mo><mi 
+>x</mi> <mi 
+>.</mi> <mo 
+class="MathClass-open" stretchy="false">(</mo><mi 
+>c</mi><mi 
+>l</mi><mi 
+>o</mi><mi 
+>s</mi><mi 
+>u</mi><mi 
+>r</mi><mi 
+>e</mi> <mi 
+>z</mi> <mi 
+>z</mi> <mo 
+class="MathClass-open" stretchy="false">(</mo><mo 
+class="MathClass-close" stretchy="false">)</mo><mo 
+class="MathClass-close" stretchy="false">)</mo><mo 
+class="MathClass-close" stretchy="false">)</mo><mo 
+class="MathClass-close" stretchy="false">)</mo><mo 
+class="MathClass-close" stretchy="false">)</mo></math>  
+                                     </p><!--l. 203--><p class="indent" >  We  now  have  a  working
+                                     <!--l. 203--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><mi 
+>λ</mi></math>-calculus
+                                     interpreter in Scheme that properly handles shadowing, and in which
+                                     the <span 
+class="cmbx-9">dmatch </span>clauses can be reordered arbitrarily. Our next task
+                                     is to translate the interpreter directly into miniKanren. We start
+                                     again with environment lookup; a faithful translation of <span 
+class="cmti-9">lookup </span>into
+                                     <span 
+class="cmti-9">lookup</span><!--l. 213--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><mspace width="0.17em" class="thinspace"/><mi 
+>o</mi></math>
+                                     might be:
+                                     (<span 
+class="cmbx-9">define </span><span 
+class="cmti-9">lookup</span><!--l. 222--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><mspace width="0.17em" class="thinspace"/><mi 
+>o</mi></math>
+                                      (<span 
+class="cmbx-9">lambda </span>(<span 
+class="cmti-9">x env t</span>)
+                                        (<span 
+class="cmbx-9">cond</span><!--l. 224--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><mi 
+>e</mi></math>
+                                          ((<!--l. 225--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" > <mo 
+class="MathClass-rel" stretchy="false">≡</mo></math> ’() <span 
+class="cmti-9">env</span>) <span 
+class="cmti-9">fail</span>)
+                                          ((<span 
+class="cmbx-9">fresh </span>(<span 
+class="cmti-9">y v rest</span>)
+                                            (<!--l. 227--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" > <mo 
+class="MathClass-rel" stretchy="false">≡</mo></math> ‘((,<span 
+class="cmti-9">y </span>. ,<span 
+class="cmti-9">v</span>) . ,<span 
+class="cmti-9">rest</span>) <span 
+class="cmti-9">env</span>) (<!--l. 227--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" > <mo 
+class="MathClass-rel" stretchy="false">≡</mo></math><span 
+class="cmti-9">y x</span>)
+                                            (<!--l. 228--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" > <mo 
+class="MathClass-rel" stretchy="false">≡</mo></math><span 
+class="cmti-9">v t</span>)))
+                                          ((<span 
+class="cmbx-9">fresh </span>(<span 
+class="cmti-9">y v rest</span>)
+                                            (<!--l. 230--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" > <mo 
+class="MathClass-rel" stretchy="false">≡</mo></math> ‘((,<span 
+class="cmti-9">y </span>. ,<span 
+class="cmti-9">v</span>) . ,<span 
+class="cmti-9">rest</span>) <span 
+class="cmti-9">env</span>) (<!--l. 230--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><mo 
+class="MathClass-rel" stretchy="false">≢</mo></math> <span 
+class="cmti-9">y x</span>)
+                                            (<span 
+class="cmti-9">lookup</span><!--l. 231--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><mspace width="0.17em" class="thinspace"/><mi 
+>o</mi></math> <span 
+class="cmti-9">x rest t</span>))))))
+                                     </p><!--l. 237--><p class="indent" >  <span 
+class="cmti-9">lookup</span><!--l. 237--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><mspace width="0.17em" class="thinspace"/><mi 
+>o</mi></math>
+                                     takes a third argument, <span 
+class="cmti-9">t</span>, which corresponds to the value
+                                     returned by the Scheme function <span 
+class="cmti-9">lookup</span>. That is, <span 
+class="cmti-9">t </span>represents
+                                     the term associated with variable <span 
+class="cmti-9">x </span>in environment <span 
+class="cmti-9">env</span>.
+                                     (<span 
+class="cmbx-9">run</span><!--l. 256--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><mo 
+class="MathClass-bin" stretchy="false">∗</mo></math> (<span 
+class="cmti-9">q</span>) (<span 
+class="cmti-9">lookup</span><!--l. 256--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><mspace width="0.17em" class="thinspace"/><mi 
+>o</mi></math> ’<span 
+class="cmss-9">y </span>’((<span 
+class="cmss-9">x </span>. <span 
+class="cmss-9">foo</span>) (<span 
+class="cmss-9">y </span>. <span 
+class="cmss-9">bar</span>)) <span 
+class="cmti-9">q</span>)) <!--l. 256--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" > <mo 
+class="MathClass-rel" stretchy="false">⇒</mo></math><!--l. 256--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><mo 
+class="MathClass-open" stretchy="false">(</mo><mi 
+>b</mi><mi 
+>a</mi><mi 
+>r</mi><mo 
+class="MathClass-close" stretchy="false">)</mo></math>
+                                     </p><!--l. 263--><p class="noindent" >If <span 
+class="cmti-9">x  </span>is not bound in <span 
+class="cmti-9">env</span>, a call to
+                                     <span 
+class="cmti-9">lookup</span><!--l. 269--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><mspace width="0.17em" class="thinspace"/><mi 
+>o</mi></math> will reach the
+                                     base case and fail<span class="footnote-mark"><a 
+href="quines5.html#fn4x0"><sup class="textsuperscript">4</sup></a></span><a 
+ id="x1-9003f4"></a> ,
+                                     rather than signaling an error as in <span 
+class="cmti-9">lookup</span>.
+                                     (<span 
+class="cmbx-9">run</span><!--l. 281--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><mo 
+class="MathClass-bin" stretchy="false">∗</mo></math> (<span 
+class="cmti-9">q</span>) (<span 
+class="cmti-9">lookup</span><!--l. 281--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><mspace width="0.17em" class="thinspace"/><mi 
+>o</mi></math> ’<span 
+class="cmss-9">w </span>’((<span 
+class="cmss-9">x </span>. <span 
+class="cmss-9">foo</span>) (<span 
+class="cmss-9">y </span>. <span 
+class="cmss-9">bar</span>)) <span 
+class="cmti-9">q</span>)) <!--l. 281--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" > <mo 
+class="MathClass-rel" stretchy="false">⇒</mo></math> ()
+                                     </p><!--l. 286--><p class="indent" >  Each <span 
+class="cmbx-9">cond</span><!--l. 287--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><mi 
+>e</mi></math>
+                                     clause in <span 
+class="cmti-9">lookup</span><!--l. 289--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><mspace width="0.17em" class="thinspace"/><mi 
+>o</mi></math>
+                                     corresponds to a <span 
+class="cmbx-9">dmatch </span>clause in <span 
+class="cmti-9">lookup</span>.
+                                     Instead of pattern matching against <span 
+class="cmti-9">env</span>,
+
+<span 
+class="cmti-9">lookup</span><!--l. 299--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><mspace width="0.17em" class="thinspace"/><mi 
+>o</mi> </math> uses
+<!--l. 301--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><mo 
+class="MathClass-rel" stretchy="false">≡</mo></math> to unify terms with
+<span 
+class="cmti-9">env</span>. The goal (<!--l. 308--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><mo 
+class="MathClass-rel" stretchy="false">≢</mo></math> <span 
+class="cmti-9">y x</span>)
+is equivalent to the guard (<span 
+class="cmti-9">not </span>(<span 
+class="cmti-9">eq? y x</span>)) in <span 
+class="cmti-9">lookup</span>. As with
+<span 
+class="cmbx-9">dmatch</span>, the order of clauses does not affect the meaning of a
+<span 
+class="cmbx-9">cond</span><!--l. 318--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><mi 
+>e</mi> </math>
+expression (but may affect its performance). Unlike
+with <span 
+class="cmbx-9">dmatch</span>, the order of expressions <span 
+class="cmti-9">within </span>a
+<span 
+class="cmbx-9">cond</span><!--l. 323--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><mi 
+>e</mi> </math>
+clause is unimportant—there are no patterns or guards within a
+<span 
+class="cmbx-9">cond</span><!--l. 327--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><mi 
+>e</mi> </math>
+clause, only goals that succeed or
+fail.<span class="footnote-mark"><a 
+href="quines6.html#fn5x0"><sup class="textsuperscript">5 </sup> </a></span> <a 
+ id="x1-9005f5"></a>  
+</p><!--l. 335--><p class="indent" >We can simplify <span 
+class="cmti-9">lookup</span><!--l. 336--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><mspace width="0.17em" class="thinspace"/><mi 
+>o</mi></math>
+by removing the first <span 
+class="cmbx-9">cond</span><!--l. 338--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><mi 
+>e</mi></math>
+clause (which always fails), and by moving the unification of <span 
+class="cmti-9">env </span>above
+the <span 
+class="cmbx-9">cond</span><!--l. 344--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><mi 
+>e</mi> </math>.
+(<span 
+class="cmbx-9">define </span><span 
+class="cmti-9">lookup</span><!--l. 350--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><mspace width="0.17em" class="thinspace"/><mi 
+>o</mi></math>
+(<span 
+class="cmbx-9">lambda </span>(<span 
+class="cmti-9">x env t</span>)
+(<span 
+class="cmbx-9">fresh </span>(<span 
+class="cmti-9">y v rest</span>)
+(<!--l. 353--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" > <mo 
+class="MathClass-rel" stretchy="false">≡</mo></math> ‘((,<span 
+class="cmti-9">y </span>. ,<span 
+class="cmti-9">v</span>) . ,<span 
+class="cmti-9">rest</span>) <span 
+class="cmti-9">env</span>)
+(<span 
+class="cmbx-9">cond</span><!--l. 354--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><mi 
+>e</mi> </math>
+((<!--l. 355--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" > <mo 
+class="MathClass-rel" stretchy="false">≡</mo></math><span 
+class="cmti-9">y x</span>) (<!--l. 355--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" > <mo 
+class="MathClass-rel" stretchy="false">≡</mo></math><span 
+class="cmti-9">v t</span>))
+((<!--l. 356--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><mo 
+class="MathClass-rel" stretchy="false">≢</mo> </math> <span 
+class="cmti-9">y x</span>) (<span 
+class="cmti-9">lookup</span><!--l. 356--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><mspace width="0.17em" class="thinspace"/><mi 
+>o</mi></math> <span 
+class="cmti-9">x rest t</span>))))))
+</p><!--l. 361--><p class="indent" >With <span 
+class="cmti-9">lookup</span><!--l. 362--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><mspace width="0.17em" class="thinspace"/><mi 
+>o</mi></math> defined, we
+can write <span 
+class="cmti-9">eval-exp</span><!--l. 364--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><mspace width="0.17em" class="thinspace"/><mi 
+>o</mi></math>, which
+in turn relies on <span 
+class="cmti-9">not-in-env</span><!--l. 367--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><mspace width="0.17em" class="thinspace"/><mi 
+>o</mi></math>.
+Since there is no notion of a guard in miniKanren, we must
+translate each <span 
+class="cmbx-9">dmatch </span>guard into one or more goal expressions;
+the Scheme predicate (<span 
+class="cmti-9">symbol? x</span>) becomes the type constraint
+(<span 
+class="cmti-9">symbol</span><!--l. 378--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><mspace width="0.17em" class="thinspace"/><mi 
+>o</mi> </math> <span 
+class="cmti-9">x</span>),
+while (<span 
+class="cmti-9">not-in-env? </span>’<span 
+class="cmss-9">lambda </span><span 
+class="cmti-9">env</span>) becomes
+(<span 
+class="cmti-9">not-in-env</span><!--l. 384--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><mspace width="0.17em" class="thinspace"/><mi 
+>o</mi> </math> ’<span 
+class="cmss-9">lambda </span><span 
+class="cmti-9">env</span>).
+(<span 
+class="cmbx-9">define </span><span 
+class="cmti-9">eval-exp</span><!--l. 389--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><mspace width="0.17em" class="thinspace"/><mi 
+>o</mi></math>
+(<span 
+class="cmbx-9">lambda </span>(<span 
+class="cmti-9">exp env val</span>)
+(<span 
+class="cmbx-9">cond</span><!--l. 391--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><mi 
+>e</mi> </math>
+((<span 
+class="cmbx-9">fresh </span>(<span 
+class="cmti-9">rator rand x body env</span><!--l. 392--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><msub><mrow 
+></mrow><mrow 
+><msub><mrow 
+></mrow><mrow 
+><mn>2</mn></mrow></msub 
+></mrow></msub 
+></math> <span 
+class="cmti-9">a</span>)
+(<!--l. 393--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" > <mo 
+class="MathClass-rel" stretchy="false">≡</mo></math> ‘(,<span 
+class="cmti-9">rator </span>,<span 
+class="cmti-9">rand</span>) <span 
+class="cmti-9">exp</span>)
+(<span 
+class="cmti-9">eval-exp</span><!--l. 394--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><mspace width="0.17em" class="thinspace"/><mi 
+>o</mi></math> <span 
+class="cmti-9">rator env </span>‘(<span 
+class="cmss-9">closure </span>,<span 
+class="cmti-9">x </span>,<span 
+class="cmti-9">body </span>,<span 
+class="cmti-9">env</span><!--l. 394--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><msub><mrow 
+></mrow><mrow 
+><msub><mrow 
+></mrow><mrow 
+>
+<mn>2</mn></mrow></msub 
+></mrow></msub 
+></math>))
+(<span 
+class="cmti-9">eval-exp</span><!--l. 395--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><mspace width="0.17em" class="thinspace"/><mi 
+>o</mi></math> <span 
+class="cmti-9">rand env a</span>)
+(<span 
+class="cmti-9">eval-exp</span><!--l. 396--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><mspace width="0.17em" class="thinspace"/><mi 
+>o</mi></math> <span 
+class="cmti-9">body </span>‘((,<span 
+class="cmti-9">x </span>. ,<span 
+class="cmti-9">a</span>) . ,<span 
+class="cmti-9">env</span><!--l. 396--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><msub><mrow 
+></mrow><mrow 
+><msub><mrow 
+></mrow><mrow 
+>
+<mn>2</mn></mrow></msub 
+></mrow></msub 
+></math>) <span 
+class="cmti-9">val</span>)))
+((<span 
+class="cmbx-9">fresh </span>(<span 
+class="cmti-9">x body</span>)
+(<!--l. 398--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" > <mo 
+class="MathClass-rel" stretchy="false">≡</mo></math> ‘(<span 
+class="cmss-9">lambda </span>(,<span 
+class="cmti-9">x</span>) ,<span 
+class="cmti-9">body</span>) <span 
+class="cmti-9">exp</span>)
+(<span 
+class="cmti-9">symbol</span><!--l. 399--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><mspace width="0.17em" class="thinspace"/><mi 
+>o</mi></math> <span 
+class="cmti-9">x</span>)
+(<!--l. 400--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" > <mo 
+class="MathClass-rel" stretchy="false">≡</mo></math> ‘(<span 
+class="cmss-9">closure </span>,<span 
+class="cmti-9">x </span>,<span 
+class="cmti-9">body </span>,<span 
+class="cmti-9">env</span>) <span 
+class="cmti-9">val</span>)
+(<span 
+class="cmti-9">not-in-env</span><!--l. 401--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><mspace width="0.17em" class="thinspace"/><mi 
+>o</mi></math> ’<span 
+class="cmss-9">lambda </span><span 
+class="cmti-9">env</span>)))
+((<span 
+class="cmti-9">symbol</span><!--l. 402--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><mspace width="0.17em" class="thinspace"/><mi 
+>o</mi></math> <span 
+class="cmti-9">exp</span>) (<span 
+class="cmti-9">lookup</span><!--l. 402--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><mspace width="0.17em" class="thinspace"/><mi 
+>o</mi></math> <span 
+class="cmti-9">exp env val</span>)))))
+</p><!--l. 408--><p class="indent" ><span 
+class="cmti-9">not-in-env</span><!--l. 408--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><mspace width="0.17em" class="thinspace"/><mi 
+>o</mi> </math>
+differs from <span 
+class="cmti-9">lookup</span><!--l. 410--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><mspace width="0.17em" class="thinspace"/><mi 
+>o</mi></math>
+and <span 
+class="cmti-9">eval-exp</span><!--l. 413--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><mspace width="0.17em" class="thinspace"/><mi 
+>o</mi> </math>
+in that it does not take an additional argument with respect to
+the Scheme function from which it was translated. This is
+because <span 
+class="cmti-9">not-in-env? </span>is a predicate—the success or failure of
+<span 
+class="cmti-9">not-in-env</span><!--l. 420--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><mspace width="0.17em" class="thinspace"/><mi 
+>o</mi> </math>
+is equivalent to <span 
+class="cmti-9">not-in-env? </span>returning <span 
+class="cmtt-9">#</span><span 
+class="cmss-9">t </span>or <span 
+class="cmtt-9">#</span><span 
+class="cmss-9">f</span>, respectively, so
+no “output” argument is needed.
+(<span 
+class="cmbx-9">define </span><span 
+class="cmti-9">not-in-env</span><!--l. 434--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><mspace width="0.17em" class="thinspace"/><mi 
+>o</mi></math>(<span 
+class="cmbx-9">lambda </span>(<span 
+class="cmti-9">x env</span>)
+                                        (<span 
+class="cmbx-9">cond</span><!--l. 436--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><mi 
+>e</mi></math>
+                                          ((<!--l. 437--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" > <mo 
+class="MathClass-rel" stretchy="false">≡</mo></math> ’() <span 
+class="cmti-9">env</span>))
+                                          ((<span 
+class="cmbx-9">fresh </span>(<span 
+class="cmti-9">y v rest</span>)
+                                            (<!--l. 439--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" > <mo 
+class="MathClass-rel" stretchy="false">≡</mo></math> ‘((,<span 
+class="cmti-9">y </span>. ,<span 
+class="cmti-9">v</span>) . ,<span 
+class="cmti-9">rest</span>) <span 
+class="cmti-9">env</span>)
+                                            (<!--l. 440--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><mo 
+class="MathClass-rel" stretchy="false">≢</mo></math> <span 
+class="cmti-9">y x</span>)
+                                            (<span 
+class="cmti-9">not-in-env</span><!--l. 441--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><mspace width="0.17em" class="thinspace"/><mi 
+>o</mi></math> <span 
+class="cmti-9">x rest</span>))))))
+                                     </p><!--l. 446--><p class="indent" >  We can use <span 
+class="cmti-9">eval-exp</span><!--l. 447--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><mspace width="0.17em" class="thinspace"/><mi 
+>o</mi></math>
+                                     to generate expression/value pairs.
+                                     (<span 
+class="cmbx-9">run</span><!--l. 453--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><mi mathvariant="bold">5</mi></math> (<span 
+class="cmti-9">q</span>)
+                                      (<span 
+class="cmbx-9">fresh </span>(<span 
+class="cmti-9">e v</span>)
+                                        (<span 
+class="cmti-9">eval-exp</span><!--l. 455--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><mspace width="0.17em" class="thinspace"/><mi 
+>o</mi></math> <span 
+class="cmti-9">e </span>’() <span 
+class="cmti-9">v</span>)
+                                        (<!--l. 456--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" > <mo 
+class="MathClass-rel" stretchy="false">≡</mo></math> ‘(,<span 
+class="cmti-9">e </span><!--l. 456--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" > <mo 
+class="MathClass-rel" stretchy="false">→</mo></math> ,<span 
+class="cmti-9">v</span>) <span 
+class="cmti-9">q</span>)))
+                                     </p><!--l. 461--><p class="noindent" >This <span 
+class="cmbx-9">run</span><!--l. 463--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><mi mathvariant="bold">5</mi></math> expression
+                                     generates five <!--l. 464--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><mi 
+>λ</mi></math>-expressions,
+                                     and the closures to which they evaluate.
+                                     </p><!--l. 469--><p class="noindent" >((((<span 
+class="cmss-9">lambda </span>(<span 
+class="cmss-9">_</span><!--l. 471--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><msub><mrow 
+></mrow><mrow 
+><msub><mrow 
+></mrow><mrow 
+><mn>0</mn></mrow></msub 
+></mrow></msub 
+></math>) <span 
+class="cmss-9">_</span><!--l. 471--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><msub><mrow 
+></mrow><mrow 
+><msub><mrow 
+></mrow><mrow 
+><mn>1</mn></mrow></msub 
+></mrow></msub 
+></math>)
+  <!--l. 472--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" > <mo 
+class="MathClass-rel" stretchy="false">→</mo></math> (<span 
+class="cmss-9">closure </span><span 
+class="cmss-9">_</span><!--l. 472--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><msub><mrow 
+></mrow><mrow 
+><msub><mrow 
+></mrow><mrow 
+><mn>0</mn></mrow></msub 
+></mrow></msub 
+></math> <span 
+class="cmss-9">_</span><!--l. 472--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><msub><mrow 
+></mrow><mrow 
+><msub><mrow 
+></mrow><mrow 
+><mn>1</mn></mrow></msub 
+></mrow></msub 
+></math> ()))
+ (<span 
+class="cmss-9">sym </span><span 
+class="cmss-9">_</span><!--l. 473--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><msub><mrow 
+></mrow><mrow 
+><msub><mrow 
+></mrow><mrow 
+><mn>0</mn></mrow></msub 
+></mrow></msub 
+></math>))
+ ((((<span 
+class="cmss-9">lambda </span>(<span 
+class="cmss-9">_</span><!--l. 474--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><msub><mrow 
+></mrow><mrow 
+><msub><mrow 
+></mrow><mrow 
+><mn>0</mn></mrow></msub 
+></mrow></msub 
+></math>) <span 
+class="cmss-9">_</span><!--l. 474--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><msub><mrow 
+></mrow><mrow 
+><msub><mrow 
+></mrow><mrow 
+><mn>0</mn></mrow></msub 
+></mrow></msub 
+></math>) (<span 
+class="cmss-9">lambda </span>(<span 
+class="cmss-9">_</span><!--l. 474--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><msub><mrow 
+></mrow><mrow 
+><msub><mrow 
+></mrow><mrow 
+><mn>1</mn></mrow></msub 
+></mrow></msub 
+></math>) <span 
+class="cmss-9">_</span><!--l. 474--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><msub><mrow 
+></mrow><mrow 
+><msub><mrow 
+></mrow><mrow 
+><mn>2</mn></mrow></msub 
+></mrow></msub 
+></math>))
+  <!--l. 475--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" > <mo 
+class="MathClass-rel" stretchy="false">→</mo></math> (<span 
+class="cmss-9">closure </span><span 
+class="cmss-9">_</span><!--l. 475--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><msub><mrow 
+></mrow><mrow 
+><msub><mrow 
+></mrow><mrow 
+><mn>1</mn></mrow></msub 
+></mrow></msub 
+></math> <span 
+class="cmss-9">_</span><!--l. 475--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><msub><mrow 
+></mrow><mrow 
+><msub><mrow 
+></mrow><mrow 
+><mn>2</mn></mrow></msub 
+></mrow></msub 
+></math> ()))
+ (<span 
+class="cmss-9">sym </span><span 
+class="cmss-9">_</span><!--l. 476--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><msub><mrow 
+></mrow><mrow 
+><msub><mrow 
+></mrow><mrow 
+><mn>0</mn></mrow></msub 
+></mrow></msub 
+></math> <span 
+class="cmss-9">_</span><!--l. 476--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><msub><mrow 
+></mrow><mrow 
+><msub><mrow 
+></mrow><mrow 
+><mn>1</mn></mrow></msub 
+></mrow></msub 
+></math>))
+ ((((<span 
+class="cmss-9">lambda </span>(<span 
+class="cmss-9">_</span><!--l. 477--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><msub><mrow 
+></mrow><mrow 
+><msub><mrow 
+></mrow><mrow 
+><mn>0</mn></mrow></msub 
+></mrow></msub 
+></math>) (<span 
+class="cmss-9">lambda </span>(<span 
+class="cmss-9">_</span><!--l. 477--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><msub><mrow 
+></mrow><mrow 
+><msub><mrow 
+></mrow><mrow 
+><mn>1</mn></mrow></msub 
+></mrow></msub 
+></math>) <span 
+class="cmss-9">_</span><!--l. 477--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><msub><mrow 
+></mrow><mrow 
+><msub><mrow 
+></mrow><mrow 
+><mn>2</mn></mrow></msub 
+></mrow></msub 
+></math>)) (<span 
+class="cmss-9">lambda </span>(<span 
+class="cmss-9">_</span><!--l. 477--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><msub><mrow 
+></mrow><mrow 
+><msub><mrow 
+></mrow><mrow 
+><mn>3</mn></mrow></msub 
+></mrow></msub 
+></math>) <span 
+class="cmss-9">_</span><!--l. 477--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><msub><mrow 
+></mrow><mrow 
+><msub><mrow 
+></mrow><mrow 
+><mn>4</mn></mrow></msub 
+></mrow></msub 
+></math>))
+  <!--l. 478--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" > <mo 
+class="MathClass-rel" stretchy="false">→</mo></math> (<span 
+class="cmss-9">closure </span><span 
+class="cmss-9">_</span><!--l. 478--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><msub><mrow 
+></mrow><mrow 
+><msub><mrow 
+></mrow><mrow 
+><mn>1</mn></mrow></msub 
+></mrow></msub 
+></math> <span 
+class="cmss-9">_</span><!--l. 478--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><msub><mrow 
+></mrow><mrow 
+><msub><mrow 
+></mrow><mrow 
+><mn>2</mn></mrow></msub 
+></mrow></msub 
+></math> ((<span 
+class="cmss-9">_</span><!--l. 478--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><msub><mrow 
+></mrow><mrow 
+><msub><mrow 
+></mrow><mrow 
+><mn>0</mn></mrow></msub 
+></mrow></msub 
+></math> . (<span 
+class="cmss-9">closure </span><span 
+class="cmss-9">_</span><!--l. 478--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><msub><mrow 
+></mrow><mrow 
+><msub><mrow 
+></mrow><mrow 
+><mn>3</mn></mrow></msub 
+></mrow></msub 
+></math> <span 
+class="cmss-9">_</span><!--l. 478--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><msub><mrow 
+></mrow><mrow 
+><msub><mrow 
+></mrow><mrow 
+><mn>4</mn></mrow></msub 
+></mrow></msub 
+></math> ())))))
+ (<!--l. 479--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><mo 
+class="MathClass-rel" stretchy="false">≢</mo></math> ((<span 
+class="cmss-9">_</span><!--l. 479--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><msub><mrow 
+></mrow><mrow 
+><msub><mrow 
+></mrow><mrow 
+><mn>0</mn></mrow></msub 
+></mrow></msub 
+></math> <span 
+class="cmss-9">lambda</span>)))
+ (<span 
+class="cmss-9">sym </span><span 
+class="cmss-9">_</span><!--l. 480--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><msub><mrow 
+></mrow><mrow 
+><msub><mrow 
+></mrow><mrow 
+><mn>0</mn></mrow></msub 
+></mrow></msub 
+></math> <span 
+class="cmss-9">_</span><!--l. 480--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><msub><mrow 
+></mrow><mrow 
+><msub><mrow 
+></mrow><mrow 
+><mn>1</mn></mrow></msub 
+></mrow></msub 
+></math> <span 
+class="cmss-9">_</span><!--l. 480--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><msub><mrow 
+></mrow><mrow 
+><msub><mrow 
+></mrow><mrow 
+><mn>3</mn></mrow></msub 
+></mrow></msub 
+></math>))
+ ((((<span 
+class="cmss-9">lambda </span>(<span 
+class="cmss-9">_</span><!--l. 481--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><msub><mrow 
+></mrow><mrow 
+><msub><mrow 
+></mrow><mrow 
+><mn>0</mn></mrow></msub 
+></mrow></msub 
+></math>) (<span 
+class="cmss-9">_</span><!--l. 481--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><msub><mrow 
+></mrow><mrow 
+><msub><mrow 
+></mrow><mrow 
+><mn>0</mn></mrow></msub 
+></mrow></msub 
+></math> <span 
+class="cmss-9">_</span><!--l. 481--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><msub><mrow 
+></mrow><mrow 
+><msub><mrow 
+></mrow><mrow 
+><mn>0</mn></mrow></msub 
+></mrow></msub 
+></math>)) (<span 
+class="cmss-9">lambda </span>(<span 
+class="cmss-9">_</span><!--l. 481--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><msub><mrow 
+></mrow><mrow 
+><msub><mrow 
+></mrow><mrow 
+><mn>1</mn></mrow></msub 
+></mrow></msub 
+></math>) <span 
+class="cmss-9">_</span><!--l. 481--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><msub><mrow 
+></mrow><mrow 
+><msub><mrow 
+></mrow><mrow 
+><mn>1</mn></mrow></msub 
+></mrow></msub 
+></math>))
+  <!--l. 482--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" > <mo 
+class="MathClass-rel" stretchy="false">→</mo></math> (<span 
+class="cmss-9">closure </span><span 
+class="cmss-9">_</span><!--l. 482--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><msub><mrow 
+></mrow><mrow 
+><msub><mrow 
+></mrow><mrow 
+><mn>1</mn></mrow></msub 
+></mrow></msub 
+></math> <span 
+class="cmss-9">_</span><!--l. 482--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><msub><mrow 
+></mrow><mrow 
+><msub><mrow 
+></mrow><mrow 
+><mn>1</mn></mrow></msub 
+></mrow></msub 
+></math> ()))
+ (<span 
+class="cmss-9">sym </span><span 
+class="cmss-9">_</span><!--l. 483--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><msub><mrow 
+></mrow><mrow 
+><msub><mrow 
+></mrow><mrow 
+><mn>0</mn></mrow></msub 
+></mrow></msub 
+></math> <span 
+class="cmss-9">_</span><!--l. 483--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><msub><mrow 
+></mrow><mrow 
+><msub><mrow 
+></mrow><mrow 
+><mn>1</mn></mrow></msub 
+></mrow></msub 
+></math>))
+ ((((<span 
+class="cmss-9">lambda </span>(<span 
+class="cmss-9">_</span><!--l. 484--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><msub><mrow 
+></mrow><mrow 
+><msub><mrow 
+></mrow><mrow 
+><mn>0</mn></mrow></msub 
+></mrow></msub 
+></math>) (<span 
+class="cmss-9">_</span><!--l. 484--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><msub><mrow 
+></mrow><mrow 
+><msub><mrow 
+></mrow><mrow 
+><mn>0</mn></mrow></msub 
+></mrow></msub 
+></math> <span 
+class="cmss-9">_</span><!--l. 484--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><msub><mrow 
+></mrow><mrow 
+><msub><mrow 
+></mrow><mrow 
+><mn>0</mn></mrow></msub 
+></mrow></msub 
+></math>))
+   (<span 
+class="cmss-9">lambda </span>(<span 
+class="cmss-9">_</span><!--l. 485--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><msub><mrow 
+></mrow><mrow 
+><msub><mrow 
+></mrow><mrow 
+><mn>1</mn></mrow></msub 
+></mrow></msub 
+></math>) (<span 
+class="cmss-9">lambda </span>(<span 
+class="cmss-9">_</span><!--l. 485--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><msub><mrow 
+></mrow><mrow 
+><msub><mrow 
+></mrow><mrow 
+><mn>2</mn></mrow></msub 
+></mrow></msub 
+></math>) <span 
+class="cmss-9">_</span><!--l. 485--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><msub><mrow 
+></mrow><mrow 
+><msub><mrow 
+></mrow><mrow 
+><mn>3</mn></mrow></msub 
+></mrow></msub 
+></math>)))
+  <!--l. 486--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" > <mo 
+class="MathClass-rel" stretchy="false">→</mo></math> (<span 
+class="cmss-9">closure </span><span 
+class="cmss-9">_</span><!--l. 486--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><msub><mrow 
+></mrow><mrow 
+><msub><mrow 
+></mrow><mrow 
+><mn>2</mn></mrow></msub 
+></mrow></msub 
+></math> <span 
+class="cmss-9">_</span><!--l. 486--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><msub><mrow 
+></mrow><mrow 
+><msub><mrow 
+></mrow><mrow 
+><mn>3</mn></mrow></msub 
+></mrow></msub 
+></math> ((<span 
+class="cmss-9">_</span><!--l. 486--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><msub><mrow 
+></mrow><mrow 
+><msub><mrow 
+></mrow><mrow 
+><mn>1</mn></mrow></msub 
+></mrow></msub 
+></math> . (<span 
+class="cmss-9">closure </span><span 
+class="cmss-9">_</span><!--l. 486--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><msub><mrow 
+></mrow><mrow 
+><msub><mrow 
+></mrow><mrow 
+><mn>1</mn></mrow></msub 
+></mrow></msub 
+></math> (<span 
+class="cmss-9">lambda </span>(<span 
+class="cmss-9">_</span><!--l. 486--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><msub><mrow 
+></mrow><mrow 
+><msub><mrow 
+></mrow><mrow 
+><mn>2</mn></mrow></msub 
+></mrow></msub 
+></math>) <span 
+class="cmss-9">_</span><!--l. 486--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><msub><mrow 
+></mrow><mrow 
+><msub><mrow 
+></mrow><mrow 
+><mn>3</mn></mrow></msub 
+></mrow></msub 
+></math>) ())))))
+ (<!--l. 487--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><mo 
+class="MathClass-rel" stretchy="false">≢</mo></math> ((<span 
+class="cmss-9">_</span><!--l. 487--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><msub><mrow 
+></mrow><mrow 
+><msub><mrow 
+></mrow><mrow 
+><mn>1</mn></mrow></msub 
+></mrow></msub 
+></math> <span 
+class="cmss-9">lambda</span>)))
+ (<span 
+class="cmss-9">sym </span><span 
+class="cmss-9">_</span><!--l. 488--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><msub><mrow 
+></mrow><mrow 
+><msub><mrow 
+></mrow><mrow 
+><mn>0</mn></mrow></msub 
+></mrow></msub 
+></math> <span 
+class="cmss-9">_</span><!--l. 488--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><msub><mrow 
+></mrow><mrow 
+><msub><mrow 
+></mrow><mrow 
+><mn>1</mn></mrow></msub 
+></mrow></msub 
+></math> <span 
+class="cmss-9">_</span><!--l. 488--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><msub><mrow 
+></mrow><mrow 
+><msub><mrow 
+></mrow><mrow 
+><mn>2</mn></mrow></msub 
+></mrow></msub 
+></math>)))
+                                     </p><!--l. 493--><p class="noindent" >The <!--l. 495--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><mo 
+class="MathClass-rel" stretchy="false">≢</mo></math> tags
+                                     in the answers indicate disequality constraints between variables and
+                                     the values they cannot assume. The constraints in the last answer state
+                                     that <span 
+class="cmss-9">_</span><!--l. 500--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><msub><mrow 
+></mrow><mrow 
+><msub><mrow 
+></mrow><mrow 
+><mn>1</mn></mrow></msub 
+></mrow></msub 
+></math>
+                                     cannot be the symbol <span 
+class="cmss-9">lambda </span>and that
+                                     <span 
+class="cmss-9">_</span><!--l. 506--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><msub><mrow 
+></mrow><mrow 
+><msub><mrow 
+></mrow><mrow 
+><mn>0</mn></mrow></msub 
+></mrow></msub 
+></math>,
+                                     <span 
+class="cmss-9">_</span><!--l. 509--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><msub><mrow 
+></mrow><mrow 
+><msub><mrow 
+></mrow><mrow 
+><mn>1</mn></mrow></msub 
+></mrow></msub 
+></math>, and
+                                     <span 
+class="cmss-9">_</span><!--l. 513--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><msub><mrow 
+></mrow><mrow 
+><msub><mrow 
+></mrow><mrow 
+><mn>2</mn></mrow></msub 
+></mrow></msub 
+></math> are
+                                     symbols.
+                                     </p><!--l. 517--><p class="indent" >  To demonstrate <span 
+class="cmti-9">eval-exp</span><!--l. 518--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><mspace width="0.17em" class="thinspace"/><mi 
+>o</mi></math>
+                                     running backwards, here are five Scheme expressions that
+                                     evaluate to the closure from the last <span 
+class="cmti-9">eval-exp </span>example:
+                                     (<span 
+class="cmbx-9">run</span><!--l. 528--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><mi mathvariant="bold">5</mi></math> (<span 
+class="cmti-9">q</span>)
+                                      (<span 
+class="cmti-9">eval-exp</span><!--l. 529--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><mspace width="0.17em" class="thinspace"/><mi 
+>o</mi></math> <span 
+class="cmti-9">q </span>’() ’(<span 
+class="cmss-9">closure y x </span>((<span 
+class="cmss-9">x </span>. (<span 
+class="cmss-9">closure z z </span>()))))))
+                                     <!--l. 530--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" > <mo 
+class="MathClass-rel" stretchy="false">⇒</mo></math>
+                                  </p><!--l. 532--><p class="noindent" >(((<span 
+class="cmss-9">lambda </span>(<span 
+class="cmss-9">x</span>) (<span 
+class="cmss-9">lambda </span>(<span 
+class="cmss-9">y</span>) <span 
+class="cmss-9">x</span>)) (<span 
+class="cmss-9">lambda </span>(<span 
+class="cmss-9">z</span>) <span 
+class="cmss-9">z</span>))
+ ((<span 
+class="cmss-9">lambda </span>(<span 
+class="cmss-9">x</span>) (<span 
+class="cmss-9">x </span>(<span 
+class="cmss-9">lambda </span>(<span 
+class="cmss-9">y</span>) <span 
+class="cmss-9">x</span>))) (<span 
+class="cmss-9">lambda </span>(<span 
+class="cmss-9">z</span>) <span 
+class="cmss-9">z</span>))
+ (((<span 
+class="cmss-9">lambda </span>(<span 
+class="cmss-9">x</span>) (<span 
+class="cmss-9">lambda </span>(<span 
+class="cmss-9">y</span>) <span 
+class="cmss-9">x</span>))
+  ((<span 
+class="cmss-9">lambda </span>(<span 
+class="cmss-9">_</span><!--l. 536--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><msub><mrow 
+></mrow><mrow 
+><msub><mrow 
+></mrow><mrow 
+><mn>0</mn></mrow></msub 
+></mrow></msub 
+></math>) <span 
+class="cmss-9">_</span><!--l. 536--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><msub><mrow 
+></mrow><mrow 
+><msub><mrow 
+></mrow><mrow 
+><mn>0</mn></mrow></msub 
+></mrow></msub 
+></math>) (<span 
+class="cmss-9">lambda </span>(<span 
+class="cmss-9">z</span>) <span 
+class="cmss-9">z</span>)))
+ (<span 
+class="cmss-9">sym </span><span 
+class="cmss-9">_</span><!--l. 537--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><msub><mrow 
+></mrow><mrow 
+><msub><mrow 
+></mrow><mrow 
+><mn>0</mn></mrow></msub 
+></mrow></msub 
+></math>))
+ ((((<span 
+class="cmss-9">lambda </span>(<span 
+class="cmss-9">_</span><!--l. 538--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><msub><mrow 
+></mrow><mrow 
+><msub><mrow 
+></mrow><mrow 
+><mn>0</mn></mrow></msub 
+></mrow></msub 
+></math>) <span 
+class="cmss-9">_</span><!--l. 538--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><msub><mrow 
+></mrow><mrow 
+><msub><mrow 
+></mrow><mrow 
+><mn>0</mn></mrow></msub 
+></mrow></msub 
+></math>) (<span 
+class="cmss-9">lambda </span>(<span 
+class="cmss-9">x</span>) (<span 
+class="cmss-9">lambda </span>(<span 
+class="cmss-9">y</span>) <span 
+class="cmss-9">x</span>)))
+  (<span 
+class="cmss-9">lambda </span>(<span 
+class="cmss-9">z</span>) <span 
+class="cmss-9">z</span>))
+ (<span 
+class="cmss-9">sym </span><span 
+class="cmss-9">_</span><!--l. 540--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><msub><mrow 
+></mrow><mrow 
+><msub><mrow 
+></mrow><mrow 
+><mn>0</mn></mrow></msub 
+></mrow></msub 
+></math>))
+ (((<span 
+class="cmss-9">lambda </span>(<span 
+class="cmss-9">_</span><!--l. 541--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><msub><mrow 
+></mrow><mrow 
+><msub><mrow 
+></mrow><mrow 
+><mn>0</mn></mrow></msub 
+></mrow></msub 
+></math>) <span 
+class="cmss-9">_</span><!--l. 541--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><msub><mrow 
+></mrow><mrow 
+><msub><mrow 
+></mrow><mrow 
+><mn>0</mn></mrow></msub 
+></mrow></msub 
+></math>)
+  ((<span 
+class="cmss-9">lambda </span>(<span 
+class="cmss-9">x</span>) (<span 
+class="cmss-9">lambda </span>(<span 
+class="cmss-9">y</span>) <span 
+class="cmss-9">x</span>)) (<span 
+class="cmss-9">lambda </span>(<span 
+class="cmss-9">z</span>) <span 
+class="cmss-9">z</span>)))
+ (<span 
+class="cmss-9">sym </span><span 
+class="cmss-9">_</span><!--l. 543--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><msub><mrow 
+></mrow><mrow 
+><msub><mrow 
+></mrow><mrow 
+><mn>0</mn></mrow></msub 
+></mrow></msub 
+></math>)))
+
+</p><!--l. 548--><p class="noindent" >The constraint (<span 
+class="cmss-9">sym </span><span 
+class="cmss-9">_</span><!--l. 550--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><msub><mrow 
+></mrow><mrow 
+><msub><mrow 
+></mrow><mrow 
+><mn>0</mn></mrow></msub 
+></mrow></msub 
+></math>)
+states that the fresh variable reified as
+<span 
+class="cmss-9">_</span><!--l. 553--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><msub><mrow 
+></mrow><mrow 
+><msub><mrow 
+></mrow><mrow 
+><mn>0</mn> </mrow> </msub 
+> </mrow> </msub 
+> </math>
+can only be associated with a symbol.
+</p>
+<h3 class="sectionHead"><span class="titlemark">4. </span> <a 
+ id="x1-100004"></a>Extending the Interpreter</h3>
+<!--l. 3--><p class="noindent" >We have a relational interpreter, but we cannot yet generate quines, or even
+evaluate <span 
+class="cmti-9">quine</span><!--l. 2--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><mi 
+>c</mi></math>
+from section <a 
+href="#x1-50001">1<!--tex4ht:ref: intro:sec --></a> when running forward. We must add <span 
+class="cmbx-9">quote </span>and
+<span 
+class="cmti-9">list </span>to the interpreter, first to the Scheme version, then to
+miniKanren translation.
+</p><!--l. 17--><p class="indent" >Adding <span 
+class="cmbx-9">quote </span>to the Scheme interpreter is relatively simple.
+Since <span 
+class="cmbx-9">quote </span>means “do not evaluate the argument,” we simply
+have to return the argument unmodified. Thus, we can support
+<span 
+class="cmbx-9">quote </span>by adding this clause to our interpreter:
+((<span 
+class="cmss-9">quote </span>,<span 
+class="cmti-9">v</span>) <span 
+class="cmti-9">v</span>)
+</p><!--l. 33--><p class="noindent" >In order to handle shadowing correctly, we must allow the user
+to override the <span 
+class="cmbx-9">quote </span>form. As with the <span 
+class="cmss-9">lambda </span>clause, we do so
+by calling <span 
+class="cmti-9">not-in-env? </span>within a guard:
+((<span 
+class="cmss-9">quote </span>,<span 
+class="cmti-9">v</span>) (<span 
+class="cmbx-9">guard </span>(<span 
+class="cmti-9">not-in-env? </span>’<span 
+class="cmss-9">quote </span><span 
+class="cmti-9">env</span>)) <span 
+class="cmti-9">v</span>)
+</p><!--l. 46--><p class="indent" >Unfortunately, <span 
+class="cmbx-9">quote </span>introduces a new problem: it is
+possible for quoted data to conflict with our representation of
+closures. For example, in the context of our interpreter, these
+two expressions are equivalent:
+</p><!--l. 53--><p class="noindent" >((<span 
+class="cmss-9">lambda </span>(<span 
+class="cmss-9">x</span>) <span 
+class="cmss-9">x</span>) (<span 
+class="cmss-9">lambda </span>(<span 
+class="cmss-9">y</span>) <span 
+class="cmss-9">y</span>)))
+</p><!--l. 57--><p class="noindent" >and
+</p><!--l. 61--><p class="noindent" >((<span 
+class="cmss-9">quote </span>(<span 
+class="cmss-9">closure x x </span>())) (<span 
+class="cmss-9">lambda </span>(<span 
+class="cmss-9">y</span>) <span 
+class="cmss-9">y</span>))
+</p><!--l. 65--><p class="noindent" >This is because (<span 
+class="cmss-9">lambda </span>(<span 
+class="cmss-9">x</span>) <span 
+class="cmss-9">x</span>) and (<span 
+class="cmss-9">quote </span>(<span 
+class="cmss-9">closure x x </span>())) both
+evaluate to (<span 
+class="cmss-9">closure x x </span>()). We circumvent this issue by
+declaring that the <span 
+class="cmss-9">closure </span>tag is a unique symbol that is not part
+of the expression language (a gensym by convention).
+</p><!--l. 112--><p class="indent" >We can now translate the <span 
+class="cmss-9">quote </span>clause to miniKanren. In the
+Scheme version, we can assume that the user will not write
+expressions containing the <span 
+class="cmss-9">closure </span>tag; alternatively, we
+could use an actual gensym for the tag. However, we are
+interested in running our relational interpreter backwards,
+and miniKanren has no compunction against generating
+expressions that include a symbol the user cannot or
+should not type. We can solve this problem by adding an
+<span 
+class="cmti-9">absent</span><!--l. 2--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><mspace width="0.17em" class="thinspace"/><mi 
+>o</mi> </math>
+constraint with the symbol <span 
+class="cmss-9">closure </span>as the first argument,
+ensuring the <span 
+class="cmss-9">closure </span>tag does not appear within <span 
+class="cmti-9">v</span>.
+((<span 
+class="cmbx-9">fresh </span>(<span 
+class="cmti-9">v</span>)
+(<!--l. 3--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" > <mo 
+class="MathClass-rel" stretchy="false">≡</mo></math> ‘(<span 
+class="cmss-9">quote </span>,<span 
+class="cmti-9">v</span>) <span 
+class="cmti-9">exp</span>)
+(<span 
+class="cmti-9">not-in-env</span><!--l. 4--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><mspace width="0.17em" class="thinspace"/><mi 
+>o</mi></math> ’<span 
+class="cmss-9">quote </span><span 
+class="cmti-9">env</span>)
+(<span 
+class="cmti-9">absent</span><!--l. 5--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><mspace width="0.17em" class="thinspace"/><mi 
+>o</mi></math> ’<span 
+class="cmss-9">closure </span><span 
+class="cmti-9">v</span>)))
+</p><!--l. 134--><p class="noindent" >Like the <span 
+class="cmss-9">lambda </span>clause presented in section <a 
+href="#x1-90003">3<!--tex4ht:ref: sec:interpreter --></a>, the <span 
+class="cmss-9">quote </span>clause uses
+<span 
+class="cmti-9">not-in-env</span><!--l. 2--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><mspace width="0.17em" class="thinspace"/><mi 
+>o</mi> </math>
+to handle shadowing.
+</p><!--l. 140--><p class="indent" >We now turn our attention to <span 
+class="cmti-9">list</span>. For the Scheme interpreter,
+<span 
+class="cmti-9">list </span>is simply a matter of mapping recursive calls to <span 
+class="cmti-9">eval-exp</span>
+over the arguments:
+((<span 
+class="cmss-9">list </span>. ,<span 
+class="cmti-9">a</span><!--l. 2--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><mo 
+class="MathClass-bin" stretchy="false">∗</mo></math>) (<span 
+class="cmbx-9">guard </span>(<span 
+class="cmti-9">not-in-env? </span>’<span 
+class="cmss-9">list </span><span 
+class="cmti-9">env</span>))
+(<span 
+class="cmti-9">map </span>(<span 
+class="cmbx-9">lambda </span>(<span 
+class="cmti-9">e</span>) (<span 
+class="cmti-9">eval-exp e env</span>)) <span 
+class="cmti-9">a</span><!--l. 3--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><mo 
+class="MathClass-bin" stretchy="false">∗</mo></math>))</p><!--l. 153--><p class="noindent" >Similarly, we can add <span 
+class="cmti-9">list </span>to the miniKanren interpreter:
+                                           ((<span 
+class="cmbx-9">fresh </span>(<span 
+class="cmti-9">a</span><!--l. 2--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><mo 
+class="MathClass-bin" stretchy="false">∗</mo></math>)
+                                             (<!--l. 3--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" > <mo 
+class="MathClass-rel" stretchy="false">≡</mo></math> ‘(<span 
+class="cmss-9">list </span>. ,<span 
+class="cmti-9">a</span><!--l. 3--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><mo 
+class="MathClass-bin" stretchy="false">∗</mo></math>) <span 
+class="cmti-9">exp</span>)
+                                             (<span 
+class="cmti-9">not-in-env</span><!--l. 4--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><mspace width="0.17em" class="thinspace"/><mi 
+>o</mi></math> ’<span 
+class="cmss-9">list </span><span 
+class="cmti-9">env</span>)
+                                             (<span 
+class="cmti-9">absent</span><!--l. 5--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><mspace width="0.17em" class="thinspace"/><mi 
+>o</mi></math> ’<span 
+class="cmss-9">closure </span><span 
+class="cmti-9">a</span><!--l. 5--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><mo 
+class="MathClass-bin" stretchy="false">∗</mo></math>)
+                                             (<span 
+class="cmti-9">proper-list</span><!--l. 6--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><mspace width="0.17em" class="thinspace"/><mi 
+>o</mi></math> <span 
+class="cmti-9">a</span><!--l. 6--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><mo 
+class="MathClass-bin" stretchy="false">∗</mo></math> <span 
+class="cmti-9">env val</span>)))
+                                     </p><!--l. 168--><p class="noindent" >Once again, we use the <span 
+class="cmti-9">absent</span><!--l. 2--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><mspace width="0.17em" class="thinspace"/><mi 
+>o</mi></math>
+                                     constraint to prevent miniKanren from generating list <span 
+class="cmti-9">expressions</span>
+                                     that contain closures. (Of course, a list expression containing
+                                     <!--l. 172--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><mi 
+>λ</mi></math>
+                                     expressions will <span 
+class="cmti-9">evaluate </span>to a list containing closures, but the
+                                     expression being evaluated must not contain closures.)
+                                     </p><!--l. 176--><p class="indent" >  As with the other tagged clauses, proper
+                                     handling of shadowing is ensured through use of
+                                     <span 
+class="cmti-9">not-in-env</span><!--l. 2--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><mspace width="0.17em" class="thinspace"/><mi 
+>o</mi></math>. These
+                                     uses of <span 
+class="cmti-9">not-in-env</span><!--l. 2--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><mspace width="0.17em" class="thinspace"/><mi 
+>o</mi></math>
+                                     also serve another purpose: without this constraint, the
+                                     expression (<span 
+class="cmss-9">list </span><span 
+class="cmti-9">x</span>) would be recognized both as a procedure
+                                     application (of whatever procedure might be bound to
+                                     the variable <span 
+class="cmti-9">list</span>), and as a use of the built-in primitive
+                                     <span 
+class="cmti-9">list</span>.
+                                     </p><!--l. 184--><p class="indent" >  The  <span 
+class="cmss-9">list  </span>clause  relies  on
+                                     <span 
+class="cmti-9">proper-list</span><!--l. 2--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><mspace width="0.17em" class="thinspace"/><mi 
+>o</mi></math>
+                                     to ensure <span 
+class="cmti-9">a</span><!--l. 2--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><mo 
+class="MathClass-bin" stretchy="false">∗</mo></math>
+                                     is a proper list:
+                                     (<span 
+class="cmbx-9">define </span><span 
+class="cmti-9">proper-list</span><!--l. 2--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><mspace width="0.17em" class="thinspace"/><mi 
+>o</mi></math>
+                                      (<span 
+class="cmbx-9">lambda </span>(<span 
+class="cmti-9">exp env val</span>)
+                                        (<span 
+class="cmbx-9">cond</span><!--l. 4--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><mi 
+>e</mi></math>
+                                          ((<!--l. 5--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" > <mo 
+class="MathClass-rel" stretchy="false">≡</mo></math> ’() <span 
+class="cmti-9">exp</span>)
+                                           (<!--l. 6--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" > <mo 
+class="MathClass-rel" stretchy="false">≡</mo></math> ’() <span 
+class="cmti-9">val</span>))
+                                          ((<span 
+class="cmbx-9">fresh </span>(<span 
+class="cmti-9">a d v-a v-d</span>)
+                                            (<!--l. 8--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" > <mo 
+class="MathClass-rel" stretchy="false">≡</mo></math> ‘(,<span 
+class="cmti-9">a </span>. ,<span 
+class="cmti-9">d</span>) <span 
+class="cmti-9">exp</span>)
+                                            (<!--l. 9--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" > <mo 
+class="MathClass-rel" stretchy="false">≡</mo></math> ‘(,<span 
+class="cmti-9">v-a </span>. ,<span 
+class="cmti-9">v-d</span>) <span 
+class="cmti-9">val</span>)
+                                            (<span 
+class="cmti-9">eval-exp</span><!--l. 10--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><mspace width="0.17em" class="thinspace"/><mi 
+>o</mi></math> <span 
+class="cmti-9">a env v-a</span>)
+                                            (<span 
+class="cmti-9">proper-list</span><!--l. 11--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><mspace width="0.17em" class="thinspace"/><mi 
+>o</mi></math> <span 
+class="cmti-9">d env v-d</span>))))))
+                                     </p><!--l. 239--><p class="indent" >  Our final definition of <span 
+class="cmti-9">eval-exp </span>is
+                                     (<span 
+class="cmbx-9">define </span><span 
+class="cmti-9">eval-exp</span>
+                                      (<span 
+class="cmbx-9">lambda </span>(<span 
+class="cmti-9">exp env</span>)
+                                        (<span 
+class="cmbx-9">dmatch </span><span 
+class="cmti-9">exp</span>
+                                          ((<span 
+class="cmss-9">quote </span>,<span 
+class="cmti-9">v</span>) (<span 
+class="cmbx-9">guard </span>(<span 
+class="cmti-9">not-in-env? </span>’<span 
+class="cmss-9">quote </span><span 
+class="cmti-9">env</span>)) <span 
+class="cmti-9">v</span>)
+                                          ((<span 
+class="cmss-9">list </span>. ,<span 
+class="cmti-9">a</span><!--l. 6--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><mo 
+class="MathClass-bin" stretchy="false">∗</mo></math>) (<span 
+class="cmbx-9">guard </span>(<span 
+class="cmti-9">not-in-env? </span>’<span 
+class="cmss-9">list </span><span 
+class="cmti-9">env</span>))
+                                           (<span 
+class="cmti-9">map </span>(<span 
+class="cmbx-9">lambda </span>(<span 
+class="cmti-9">e</span>) (<span 
+class="cmti-9">eval-exp e env</span>)) <span 
+class="cmti-9">a</span><!--l. 7--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><mo 
+class="MathClass-bin" stretchy="false">∗</mo></math>))
+                                          (,<span 
+class="cmti-9">x </span>(<span 
+class="cmbx-9">guard </span>(<span 
+class="cmti-9">symbol? x</span>)) (<span 
+class="cmti-9">lookup x env</span>))
+                                          ((,<span 
+class="cmti-9">rator </span>,<span 
+class="cmti-9">rand</span>)
+                                           (<span 
+class="cmbx-9">guard </span>(<span 
+class="cmti-9">rator? rator env</span>))
+                                           (<span 
+class="cmbx-9">let</span> ((<span 
+class="cmti-9">proc </span>(<span 
+class="cmti-9">eval-exp rator env</span>))
+                                               (<span 
+class="cmti-9">arg </span>(<span 
+class="cmti-9">eval-exp rand env</span>)))
+                                             (<span 
+class="cmbx-9">dmatch </span><span 
+class="cmti-9">proc</span>
+                                               ((<span 
+class="cmss-9">closure </span>,<span 
+class="cmti-9">x </span>,<span 
+class="cmti-9">body </span>,<span 
+class="cmti-9">env</span>)
+                                               (<span 
+class="cmti-9">eval-exp body </span>‘((,<span 
+class="cmti-9">x </span>. ,<span 
+class="cmti-9">arg</span>) . ,<span 
+class="cmti-9">env</span>))))))
+                                          ((<span 
+class="cmss-9">lambda </span>(,<span 
+class="cmti-9">x</span>) ,<span 
+class="cmti-9">body</span>)
+                                           (<span 
+class="cmbx-9">guard </span>(<span 
+class="cmti-9">symbol? x</span>) (<span 
+class="cmti-9">not-in-env? </span>’<span 
+class="cmss-9">lambda </span><span 
+class="cmti-9">env</span>))
+                                           ‘(<span 
+class="cmss-9">closure </span>,<span 
+class="cmti-9">x </span>,<span 
+class="cmti-9">body </span>,<span 
+class="cmti-9">env</span>)))))
+                                     (<span 
+class="cmbx-9">define </span><span 
+class="cmti-9">rator?</span>
+                                      (<span 
+class="cmbx-9">let </span>((<span 
+class="cmti-9">op-names </span>’(<span 
+class="cmss-9">lambda quote list</span>)))
+                                        (<span 
+class="cmbx-9">lambda </span>(<span 
+class="cmti-9">x env</span>)
+                                          (<span 
+class="cmti-9">not</span> (<span 
+class="cmbx-9">and</span> (<span 
+class="cmti-9">symbol? x</span>)
+                                                  (<span 
+class="cmti-9">memq x op-names</span>)
+                                                  (<span 
+class="cmti-9">not-in-env? x env</span>))))))
+                                     </p><!--l. 302--><p class="indent" >  The <span 
+class="cmti-9">rator? </span>predicate is used to ensure the procedure
+
+application clause does not overlap with the <span 
+class="cmss-9">lambda</span>, <span 
+class="cmss-9">list</span>, or
+<span 
+class="cmss-9">quote </span>clauses. An expression <span 
+class="cmti-9">x </span>is an operator, <span 
+class="cmti-9">unless </span>it one of
+the symbols <span 
+class="cmss-9">lambda</span>, <span 
+class="cmss-9">list</span>, or <span 
+class="cmss-9">quote</span>, <span 
+class="cmti-9">and </span>it is not bound
+in the environment. (If <span 
+class="cmti-9">x </span>is bound in <span 
+class="cmti-9">env</span>, it means the
+operator is being shadowed, and that <span 
+class="cmti-9">exp </span>is a procedure
+application).
+</p><!--l. 319--><p class="indent" >The definition of <span 
+class="cmti-9">eval-exp </span>in section <a 
+href="quines4.html#x4-9002x3">3<!--tex4ht:ref: lambdacalevalexp --></a>
+does not need to use <span 
+class="cmti-9">rator? </span>because the three
+<!--l. 321--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><mi 
+>λ</mi></math>-calculus
+expressions have different shapes: applications are represented
+by lists of length two, abstractions are represented by lists of
+length three, and variables are represented by symbols.
+Therefore there is no overlap between clauses, which is required
+when using <span 
+class="cmbx-9">dmatch</span>.
+</p><!--l. 327--><p class="indent" >Here is the extended relational interpreter.
+(<span 
+class="cmbx-9">define </span><span 
+class="cmti-9">eval-exp</span><!--l. 2--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><mspace width="0.17em" class="thinspace"/><mi 
+>o</mi></math>
+(<span 
+class="cmbx-9">lambda </span>(<span 
+class="cmti-9">exp env val</span>)
+(<span 
+class="cmbx-9">cond</span><!--l. 4--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><mi 
+>e</mi> </math>
+((<span 
+class="cmbx-9">fresh </span>(<span 
+class="cmti-9">v</span>)
+(<!--l. 6--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" > <mo 
+class="MathClass-rel" stretchy="false">≡</mo></math> ‘(<span 
+class="cmss-9">quote </span>,<span 
+class="cmti-9">v</span>) <span 
+class="cmti-9">exp</span>)
+(<span 
+class="cmti-9">not-in-env</span><!--l. 7--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><mspace width="0.17em" class="thinspace"/><mi 
+>o</mi></math> ’<span 
+class="cmss-9">quote </span><span 
+class="cmti-9">env</span>)
+(<span 
+class="cmti-9">absent</span><!--l. 8--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><mspace width="0.17em" class="thinspace"/><mi 
+>o</mi></math> ’<span 
+class="cmss-9">closure </span><span 
+class="cmti-9">v</span>)
+(<!--l. 9--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" > <mo 
+class="MathClass-rel" stretchy="false">≡</mo></math><span 
+class="cmti-9">v val</span>)))
+((<span 
+class="cmbx-9">fresh </span>(<span 
+class="cmti-9">a</span><!--l. 10--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><mo 
+class="MathClass-bin" stretchy="false">∗</mo></math>)
+(<!--l. 11--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" > <mo 
+class="MathClass-rel" stretchy="false">≡</mo></math> ‘(<span 
+class="cmss-9">list </span>. ,<span 
+class="cmti-9">a</span><!--l. 11--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><mo 
+class="MathClass-bin" stretchy="false">∗</mo></math>) <span 
+class="cmti-9">exp</span>)
+(<span 
+class="cmti-9">not-in-env</span><!--l. 12--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><mspace width="0.17em" class="thinspace"/><mi 
+>o</mi></math> ’<span 
+class="cmss-9">list </span><span 
+class="cmti-9">env</span>)
+(<span 
+class="cmti-9">absent</span><!--l. 13--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><mspace width="0.17em" class="thinspace"/><mi 
+>o</mi></math> ’<span 
+class="cmss-9">closure </span><span 
+class="cmti-9">a</span><!--l. 13--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><mo 
+class="MathClass-bin" stretchy="false">∗</mo></math>)
+(<span 
+class="cmti-9">proper-list</span><!--l. 14--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><mspace width="0.17em" class="thinspace"/><mi 
+>o</mi></math> <span 
+class="cmti-9">a</span><!--l. 14--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><mo 
+class="MathClass-bin" stretchy="false">∗</mo></math> <span 
+class="cmti-9">env val</span>)))
+((<span 
+class="cmti-9">symbol</span><!--l. 15--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><mspace width="0.17em" class="thinspace"/><mi 
+>o</mi></math> <span 
+class="cmti-9">exp</span>) (<span 
+class="cmti-9">lookup</span><!--l. 15--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><mspace width="0.17em" class="thinspace"/><mi 
+>o</mi></math> <span 
+class="cmti-9">exp env val</span>))
+((<span 
+class="cmbx-9">fresh </span>(<span 
+class="cmti-9">rator rand x body envˆ a</span>)
+(<!--l. 17--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" > <mo 
+class="MathClass-rel" stretchy="false">≡</mo></math> ‘(,<span 
+class="cmti-9">rator </span>,<span 
+class="cmti-9">rand</span>) <span 
+class="cmti-9">exp</span>)
+(<span 
+class="cmti-9">eval-exp</span><!--l. 18--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><mspace width="0.17em" class="thinspace"/><mi 
+>o</mi></math> <span 
+class="cmti-9">rator env </span>‘(<span 
+class="cmss-9">closure </span>,<span 
+class="cmti-9">x </span>,<span 
+class="cmti-9">body </span>,<span 
+class="cmti-9">envˆ</span>))
+(<span 
+class="cmti-9">eval-exp</span><!--l. 19--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><mspace width="0.17em" class="thinspace"/><mi 
+>o</mi></math> <span 
+class="cmti-9">rand env a</span>)
+(<span 
+class="cmti-9">eval-exp</span><!--l. 20--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><mspace width="0.17em" class="thinspace"/><mi 
+>o</mi></math> <span 
+class="cmti-9">body </span>‘((,<span 
+class="cmti-9">x </span>. ,<span 
+class="cmti-9">a</span>) . ,<span 
+class="cmti-9">envˆ</span>) <span 
+class="cmti-9">val</span>)))
+((<span 
+class="cmbx-9">fresh </span>(<span 
+class="cmti-9">x body</span>)
+(<!--l. 22--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" > <mo 
+class="MathClass-rel" stretchy="false">≡</mo></math> ‘(<span 
+class="cmss-9">lambda </span>(,<span 
+class="cmti-9">x</span>) ,<span 
+class="cmti-9">body</span>) <span 
+class="cmti-9">exp</span>)
+(<span 
+class="cmti-9">symbol</span><!--l. 23--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><mspace width="0.17em" class="thinspace"/><mi 
+>o</mi></math> <span 
+class="cmti-9">x</span>)
+(<span 
+class="cmti-9">not-in-env</span><!--l. 24--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><mspace width="0.17em" class="thinspace"/><mi 
+>o</mi></math> ’<span 
+class="cmss-9">lambda </span><span 
+class="cmti-9">env</span>)
+(<!--l. 25--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" > <mo 
+class="MathClass-rel" stretchy="false">≡</mo></math> ‘(<span 
+class="cmss-9">closure </span>,<span 
+class="cmti-9">x </span>,<span 
+class="cmti-9">body </span>,<span 
+class="cmti-9">env</span>) <span 
+class="cmti-9">val</span>))))))
+</p><!--l. 358--><p class="noindent" >It is not necessary to test if a rator is valid, since the
+application clause will fail if <span 
+class="cmti-9">rator </span>is a symbol not bound in the
+environment. If <span 
+class="cmti-9">exp </span>is (<span 
+class="cmss-9">quote </span>(<span 
+class="cmss-9">lambda </span>(<span 
+class="cmss-9">x</span>) <span 
+class="cmss-9">x</span>)), for example, and
+<span 
+class="cmti-9">env </span>contains a binding between <span 
+class="cmss-9">quote </span>and a closure, then
+<span 
+class="cmti-9">eval-exp</span><!--l. 2--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><mspace width="0.17em" class="thinspace"/><mi 
+>o</mi> </math>
+will treat the expression as a procedure application, rather than
+a use of the <span 
+class="cmbx-9">quote </span>form; otherwise, if <span 
+class="cmss-9">quote </span>is not bound to a
+closure in <span 
+class="cmti-9">env</span>, the application clause will fail.
+</p><!--l. 1--><p class="noindent" >
+</p>
+<h3 class="sectionHead"><span class="titlemark">5. </span> <a 
+ id="x1-110005"></a>Generating Quines</h3>
+<!--l. 3--><p class="noindent" >After much work, we are finally ready to put
+<span 
+class="cmti-9">eval-exp</span><!--l. 2--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><mspace width="0.17em" class="thinspace"/><mi 
+>o</mi> </math>
+through its paces, and generate a quine. The call to
+<span 
+class="cmti-9">eval-exp</span><!--l. 2--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><mspace width="0.17em" class="thinspace"/><mi 
+>o</mi> </math>
+is trivial—we want to find a Scheme expression <span 
+class="cmti-9">q </span>that, when
+evaluated in the empty environment, returns itself.
+(<span 
+class="cmbx-9">run</span><!--l. 2--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><mi mathvariant="bold">1 </mi></math> (<span 
+class="cmti-9">q</span>) (<span 
+class="cmti-9">eval-exp</span><!--l. 2--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><mspace width="0.17em" class="thinspace"/><mi 
+>o</mi></math> <span 
+class="cmti-9">q </span>’() <span 
+class="cmti-9">q</span>)) <!--l. 2--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" > <mo 
+class="MathClass-rel" stretchy="false">⇒</mo></math> </p><!--l. 1--><p class="noindent" >((((<span 
+class="cmss-9">lambda </span>(<span 
+class="cmss-9">_</span><!--l. 2--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><msub><mrow 
+></mrow><mrow 
+><msub><mrow 
+></mrow><mrow 
+><mn>0</mn> </mrow> </msub 
+> </mrow> </msub 
+> </math>) (<span 
+class="cmss-9">list </span><span 
+class="cmss-9">_</span><!--l. 2--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><msub><mrow 
+></mrow><mrow 
+><msub><mrow 
+></mrow><mrow 
+><mn>0</mn> </mrow> </msub 
+> </mrow> </msub 
+> </math> (<span 
+class="cmss-9">list </span>’<span 
+class="cmss-9">quote </span><span 
+class="cmss-9">_</span><!--l. 2--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><msub><mrow 
+></mrow><mrow 
+><msub><mrow 
+></mrow><mrow 
+><mn>0</mn></mrow></msub 
+></mrow></msub 
+></math>)))
+  ’(<span 
+class="cmss-9">lambda </span>(<span 
+class="cmss-9">_</span><!--l. 3--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><msub><mrow 
+></mrow><mrow 
+><msub><mrow 
+></mrow><mrow 
+><mn>0</mn></mrow></msub 
+></mrow></msub 
+></math>) (<span 
+class="cmss-9">list </span><span 
+class="cmss-9">_</span><!--l. 3--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><msub><mrow 
+></mrow><mrow 
+><msub><mrow 
+></mrow><mrow 
+><mn>0</mn></mrow></msub 
+></mrow></msub 
+></math> (<span 
+class="cmss-9">list </span>’<span 
+class="cmss-9">quote </span><span 
+class="cmss-9">_</span><!--l. 3--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><msub><mrow 
+></mrow><mrow 
+><msub><mrow 
+></mrow><mrow 
+><mn>0</mn></mrow></msub 
+></mrow></msub 
+></math>))))
+ (<!--l. 4--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><mo 
+class="MathClass-rel" stretchy="false">≢</mo></math> ((<span 
+class="cmss-9">_</span><!--l. 4--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><msub><mrow 
+></mrow><mrow 
+><msub><mrow 
+></mrow><mrow 
+><mn>0</mn></mrow></msub 
+></mrow></msub 
+></math> <span 
+class="cmss-9">closure</span>)) ((<span 
+class="cmss-9">_</span><!--l. 4--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><msub><mrow 
+></mrow><mrow 
+><msub><mrow 
+></mrow><mrow 
+><mn>0</mn></mrow></msub 
+></mrow></msub 
+></math> <span 
+class="cmss-9">list</span>)) ((<span 
+class="cmss-9">_</span><!--l. 4--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><msub><mrow 
+></mrow><mrow 
+><msub><mrow 
+></mrow><mrow 
+><mn>0</mn></mrow></msub 
+></mrow></msub 
+></math> <span 
+class="cmss-9">quote</span>)))
+ (<span 
+class="cmss-9">sym </span><span 
+class="cmss-9">_</span><!--l. 5--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><msub><mrow 
+></mrow><mrow 
+><msub><mrow 
+></mrow><mrow 
+><mn>0</mn></mrow></msub 
+></mrow></msub 
+></math>)))
+                                     </p><!--l. 22--><p class="noindent" >Sure enough, this is our old friend,
+                                     <span 
+class="cmti-9">quine</span><!--l. 2--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><mi 
+>c</mi></math>.
+                                     </p><!--l. 25--><p class="indent" >  We can push things further by attempting to generate
+                                     <span 
+class="cmti-9">twines</span>, also known as “twin quines” or “double quines.” That
+                                     is, we want to find programs <span 
+class="cmti-9">p </span>and <span 
+class="cmti-9">q </span>such that (<span 
+class="cmti-9">eval p</span>)
+                                     <!--l. 27--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" > <mo 
+class="MathClass-rel" stretchy="false">⇒</mo></math><span 
+class="cmti-9">q </span>and
+                                     (<span 
+class="cmti-9">eval q</span>) <!--l. 31--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" > <mo 
+class="MathClass-rel" stretchy="false">⇒</mo></math>
+                                     <span 
+class="cmti-9">p</span>. According to this definition every quine is trivially a twine, so
+                                     we add the restriction that <span 
+class="cmti-9">p </span>and <span 
+class="cmti-9">q </span>are not equal.
+                                     (<span 
+class="cmbx-9">run</span><!--l. 2--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><mi mathvariant="bold">1</mi></math> (<span 
+class="cmti-9">x</span>)
+                                      (<span 
+class="cmbx-9">fresh </span>(<span 
+class="cmti-9">p q</span>)
+                                        (<!--l. 4--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><mo 
+class="MathClass-rel" stretchy="false">≢</mo></math> <span 
+class="cmti-9">p q</span>)
+                                        (<span 
+class="cmti-9">eval-exp</span><!--l. 5--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><mspace width="0.17em" class="thinspace"/><mi 
+>o</mi></math> <span 
+class="cmti-9">p </span>’() <span 
+class="cmti-9">q</span>) (<span 
+class="cmti-9">eval-exp</span><!--l. 5--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><mspace width="0.17em" class="thinspace"/><mi 
+>o</mi></math> <span 
+class="cmti-9">q </span>’() <span 
+class="cmti-9">p</span>)
+                                        (<!--l. 6--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" > <mo 
+class="MathClass-rel" stretchy="false">≡</mo></math> ‘(,<span 
+class="cmti-9">p </span>,<span 
+class="cmti-9">q</span>) <span 
+class="cmti-9">x</span>)))
+                                     <!--l. 7--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" > <mo 
+class="MathClass-rel" stretchy="false">⇒</mo></math> 
+                                  </p><!--l. 1--><p class="noindent" >(((’((<span 
+class="cmss-9">lambda </span>(<span 
+class="cmss-9">_</span><!--l. 2--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><msub><mrow 
+></mrow><mrow 
+><msub><mrow 
+></mrow><mrow 
+><mn>0</mn></mrow></msub 
+></mrow></msub 
+></math>)
+     (<span 
+class="cmss-9">list </span>’<span 
+class="cmss-9">quote </span>(<span 
+class="cmss-9">list </span><span 
+class="cmss-9">_</span><!--l. 3--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><msub><mrow 
+></mrow><mrow 
+><msub><mrow 
+></mrow><mrow 
+><mn>0</mn></mrow></msub 
+></mrow></msub 
+></math> (<span 
+class="cmss-9">list </span>’<span 
+class="cmss-9">quote </span><span 
+class="cmss-9">_</span><!--l. 3--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><msub><mrow 
+></mrow><mrow 
+><msub><mrow 
+></mrow><mrow 
+><mn>0</mn></mrow></msub 
+></mrow></msub 
+></math>))))
+   ’(<span 
+class="cmss-9">lambda </span>(<span 
+class="cmss-9">_</span><!--l. 4--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><msub><mrow 
+></mrow><mrow 
+><msub><mrow 
+></mrow><mrow 
+><mn>0</mn></mrow></msub 
+></mrow></msub 
+></math>) (<span 
+class="cmss-9">list </span>’<span 
+class="cmss-9">quote </span>(<span 
+class="cmss-9">list </span><span 
+class="cmss-9">_</span><!--l. 4--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><msub><mrow 
+></mrow><mrow 
+><msub><mrow 
+></mrow><mrow 
+><mn>0</mn></mrow></msub 
+></mrow></msub 
+></math> (<span 
+class="cmss-9">list </span>’<span 
+class="cmss-9">quote </span><span 
+class="cmss-9">_</span><!--l. 4--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><msub><mrow 
+></mrow><mrow 
+><msub><mrow 
+></mrow><mrow 
+><mn>0</mn></mrow></msub 
+></mrow></msub 
+></math>)))))
+   ((<span 
+class="cmss-9">lambda </span>(<span 
+class="cmss-9">_</span><!--l. 5--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><msub><mrow 
+></mrow><mrow 
+><msub><mrow 
+></mrow><mrow 
+><mn>0</mn></mrow></msub 
+></mrow></msub 
+></math>) (<span 
+class="cmss-9">list </span>’<span 
+class="cmss-9">quote </span>(<span 
+class="cmss-9">list </span><span 
+class="cmss-9">_</span><!--l. 5--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><msub><mrow 
+></mrow><mrow 
+><msub><mrow 
+></mrow><mrow 
+><mn>0</mn></mrow></msub 
+></mrow></msub 
+></math> (<span 
+class="cmss-9">list </span>’<span 
+class="cmss-9">quote </span><span 
+class="cmss-9">_</span><!--l. 5--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><msub><mrow 
+></mrow><mrow 
+><msub><mrow 
+></mrow><mrow 
+><mn>0</mn></mrow></msub 
+></mrow></msub 
+></math>))))
+    ’(<span 
+class="cmss-9">lambda </span>(<span 
+class="cmss-9">_</span><!--l. 6--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><msub><mrow 
+></mrow><mrow 
+><msub><mrow 
+></mrow><mrow 
+><mn>0</mn></mrow></msub 
+></mrow></msub 
+></math>) (<span 
+class="cmss-9">list </span>’<span 
+class="cmss-9">quote </span>(<span 
+class="cmss-9">list </span><span 
+class="cmss-9">_</span><!--l. 6--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><msub><mrow 
+></mrow><mrow 
+><msub><mrow 
+></mrow><mrow 
+><mn>0</mn></mrow></msub 
+></mrow></msub 
+></math> (<span 
+class="cmss-9">list </span>’<span 
+class="cmss-9">quote </span><span 
+class="cmss-9">_</span><!--l. 6--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><msub><mrow 
+></mrow><mrow 
+><msub><mrow 
+></mrow><mrow 
+><mn>0</mn></mrow></msub 
+></mrow></msub 
+></math>))))))
+  (<!--l. 7--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><mo 
+class="MathClass-rel" stretchy="false">≢</mo></math> ((<span 
+class="cmss-9">_</span><!--l. 7--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><msub><mrow 
+></mrow><mrow 
+><msub><mrow 
+></mrow><mrow 
+><mn>0</mn></mrow></msub 
+></mrow></msub 
+></math> <span 
+class="cmss-9">closure</span>)) ((<span 
+class="cmss-9">_</span><!--l. 7--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><msub><mrow 
+></mrow><mrow 
+><msub><mrow 
+></mrow><mrow 
+><mn>0</mn></mrow></msub 
+></mrow></msub 
+></math> <span 
+class="cmss-9">list</span>)) ((<span 
+class="cmss-9">_</span><!--l. 7--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><msub><mrow 
+></mrow><mrow 
+><msub><mrow 
+></mrow><mrow 
+><mn>0</mn></mrow></msub 
+></mrow></msub 
+></math> <span 
+class="cmss-9">quote</span>)))
+  (<span 
+class="cmss-9">sym </span><span 
+class="cmss-9">_</span><!--l. 8--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><msub><mrow 
+></mrow><mrow 
+><msub><mrow 
+></mrow><mrow 
+><mn>0</mn></mrow></msub 
+></mrow></msub 
+></math>)))
+                                     </p><!--l. 57--><p class="indent" >  Finally, we generate <span 
+class="cmti-9">thrines</span>: distinct programs <span 
+class="cmti-9">p</span>, <span 
+class="cmti-9">q</span>, and <span 
+class="cmti-9">r </span>such that
+                                     (<span 
+class="cmti-9">eval p</span>) <!--l. 60--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" > <mo 
+class="MathClass-rel" stretchy="false">⇒</mo></math><span 
+class="cmti-9">q</span>,
+                                     (<span 
+class="cmti-9">eval q</span>) <!--l. 62--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" > <mo 
+class="MathClass-rel" stretchy="false">⇒</mo></math><span 
+class="cmti-9">r</span>,
+                                     and (<span 
+class="cmti-9">eval r</span>) <!--l. 66--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" > <mo 
+class="MathClass-rel" stretchy="false">⇒</mo></math>
+                                     <span 
+class="cmti-9">p</span>.
+                                     (<span 
+class="cmbx-9">run</span><!--l. 2--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><mi mathvariant="bold">1</mi></math> (<span 
+class="cmti-9">x</span>)
+                                      (<span 
+class="cmbx-9">fresh </span>(<span 
+class="cmti-9">p q r</span>)
+                                        (<!--l. 4--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><mo 
+class="MathClass-rel" stretchy="false">≢</mo></math> <span 
+class="cmti-9">p q</span>) (<!--l. 4--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><mo 
+class="MathClass-rel" stretchy="false">≢</mo></math> <span 
+class="cmti-9">q r</span>) (<!--l. 4--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><mo 
+class="MathClass-rel" stretchy="false">≢</mo></math> <span 
+class="cmti-9">r p</span>)
+                                        (<span 
+class="cmti-9">eval-exp</span><!--l. 5--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><mspace width="0.17em" class="thinspace"/><mi 
+>o</mi></math> <span 
+class="cmti-9">p </span>’() <span 
+class="cmti-9">q</span>) (<span 
+class="cmti-9">eval-exp</span><!--l. 5--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><mspace width="0.17em" class="thinspace"/><mi 
+>o</mi></math> <span 
+class="cmti-9">q </span>’() <span 
+class="cmti-9">r</span>) (<span 
+class="cmti-9">eval-exp</span><!--l. 5--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><mspace width="0.17em" class="thinspace"/><mi 
+>o</mi></math> <span 
+class="cmti-9">r </span>’() <span 
+class="cmti-9">p</span>)
+                                        (<!--l. 6--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" > <mo 
+class="MathClass-rel" stretchy="false">≡</mo></math> ‘(,<span 
+class="cmti-9">p </span>,<span 
+class="cmti-9">q </span>,<span 
+class="cmti-9">r</span>) <span 
+class="cmti-9">x</span>)))
+                                     <!--l. 7--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" > <mo 
+class="MathClass-rel" stretchy="false">⇒</mo></math>
+                                  </p><!--l. 1--><p class="noindent" >(((”((<span 
+class="cmss-9">lambda </span>(<span 
+class="cmss-9">_</span><!--l. 2--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><msub><mrow 
+></mrow><mrow 
+><msub><mrow 
+></mrow><mrow 
+><mn>0</mn></mrow></msub 
+></mrow></msub 
+></math>)
+     (<span 
+class="cmss-9">list </span>’<span 
+class="cmss-9">quote </span>(<span 
+class="cmss-9">list </span>’<span 
+class="cmss-9">quote </span>(<span 
+class="cmss-9">list </span><span 
+class="cmss-9">_</span><!--l. 3--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><msub><mrow 
+></mrow><mrow 
+><msub><mrow 
+></mrow><mrow 
+><mn>0</mn></mrow></msub 
+></mrow></msub 
+></math> (<span 
+class="cmss-9">list </span>’<span 
+class="cmss-9">quote </span><span 
+class="cmss-9">_</span><!--l. 3--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><msub><mrow 
+></mrow><mrow 
+><msub><mrow 
+></mrow><mrow 
+><mn>0</mn></mrow></msub 
+></mrow></msub 
+></math>)))))
+    ’(<span 
+class="cmss-9">lambda </span>(<span 
+class="cmss-9">_</span><!--l. 4--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><msub><mrow 
+></mrow><mrow 
+><msub><mrow 
+></mrow><mrow 
+><mn>0</mn></mrow></msub 
+></mrow></msub 
+></math>)
+      (<span 
+class="cmss-9">list </span>’<span 
+class="cmss-9">quote </span>(<span 
+class="cmss-9">list </span>’<span 
+class="cmss-9">quote </span>(<span 
+class="cmss-9">list </span><span 
+class="cmss-9">_</span><!--l. 5--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><msub><mrow 
+></mrow><mrow 
+><msub><mrow 
+></mrow><mrow 
+><mn>0</mn></mrow></msub 
+></mrow></msub 
+></math> (<span 
+class="cmss-9">list </span>’<span 
+class="cmss-9">quote </span><span 
+class="cmss-9">_</span><!--l. 5--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><msub><mrow 
+></mrow><mrow 
+><msub><mrow 
+></mrow><mrow 
+><mn>0</mn></mrow></msub 
+></mrow></msub 
+></math>))))))
+   ’((<span 
+class="cmss-9">lambda </span>(<span 
+class="cmss-9">_</span><!--l. 6--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><msub><mrow 
+></mrow><mrow 
+><msub><mrow 
+></mrow><mrow 
+><mn>0</mn></mrow></msub 
+></mrow></msub 
+></math>)
+      (<span 
+class="cmss-9">list </span>’<span 
+class="cmss-9">quote </span>(<span 
+class="cmss-9">list </span>’<span 
+class="cmss-9">quote </span>(<span 
+class="cmss-9">list </span><span 
+class="cmss-9">_</span><!--l. 7--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><msub><mrow 
+></mrow><mrow 
+><msub><mrow 
+></mrow><mrow 
+><mn>0</mn></mrow></msub 
+></mrow></msub 
+></math> (<span 
+class="cmss-9">list </span>’<span 
+class="cmss-9">quote </span><span 
+class="cmss-9">_</span><!--l. 7--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><msub><mrow 
+></mrow><mrow 
+><msub><mrow 
+></mrow><mrow 
+><mn>0</mn></mrow></msub 
+></mrow></msub 
+></math>)))))
+    ’(<span 
+class="cmss-9">lambda </span>(<span 
+class="cmss-9">_</span><!--l. 8--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><msub><mrow 
+></mrow><mrow 
+><msub><mrow 
+></mrow><mrow 
+><mn>0</mn></mrow></msub 
+></mrow></msub 
+></math>)
+      (<span 
+class="cmss-9">list </span>’<span 
+class="cmss-9">quote </span>(<span 
+class="cmss-9">list </span>’<span 
+class="cmss-9">quote </span>(<span 
+class="cmss-9">list </span><span 
+class="cmss-9">_</span><!--l. 9--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><msub><mrow 
+></mrow><mrow 
+><msub><mrow 
+></mrow><mrow 
+><mn>0</mn></mrow></msub 
+></mrow></msub 
+></math> (<span 
+class="cmss-9">list </span>’<span 
+class="cmss-9">quote </span><span 
+class="cmss-9">_</span><!--l. 9--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><msub><mrow 
+></mrow><mrow 
+><msub><mrow 
+></mrow><mrow 
+><mn>0</mn></mrow></msub 
+></mrow></msub 
+></math>))))))
+   ((<span 
+class="cmss-9">lambda </span>(<span 
+class="cmss-9">_</span><!--l. 10--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><msub><mrow 
+></mrow><mrow 
+><msub><mrow 
+></mrow><mrow 
+><mn>0</mn></mrow></msub 
+></mrow></msub 
+></math>)
+     (<span 
+class="cmss-9">list </span>’<span 
+class="cmss-9">quote </span>(<span 
+class="cmss-9">list </span>’<span 
+class="cmss-9">quote </span>(<span 
+class="cmss-9">list </span><span 
+class="cmss-9">_</span><!--l. 11--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><msub><mrow 
+></mrow><mrow 
+><msub><mrow 
+></mrow><mrow 
+><mn>0</mn></mrow></msub 
+></mrow></msub 
+></math> (<span 
+class="cmss-9">list </span>’<span 
+class="cmss-9">quote </span><span 
+class="cmss-9">_</span><!--l. 11--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><msub><mrow 
+></mrow><mrow 
+><msub><mrow 
+></mrow><mrow 
+><mn>0</mn></mrow></msub 
+></mrow></msub 
+></math>)))))
+    ’(<span 
+class="cmss-9">lambda </span>(<span 
+class="cmss-9">_</span><!--l. 12--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><msub><mrow 
+></mrow><mrow 
+><msub><mrow 
+></mrow><mrow 
+><mn>0</mn></mrow></msub 
+></mrow></msub 
+></math>)
+      (<span 
+class="cmss-9">list </span>’<span 
+class="cmss-9">quote </span>(<span 
+class="cmss-9">list </span>’<span 
+class="cmss-9">quote </span>(<span 
+class="cmss-9">list </span><span 
+class="cmss-9">_</span><!--l. 13--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><msub><mrow 
+></mrow><mrow 
+><msub><mrow 
+></mrow><mrow 
+><mn>0</mn></mrow></msub 
+></mrow></msub 
+></math> (<span 
+class="cmss-9">list </span>’<span 
+class="cmss-9">quote </span><span 
+class="cmss-9">_</span><!--l. 13--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><msub><mrow 
+></mrow><mrow 
+><msub><mrow 
+></mrow><mrow 
+><mn>0</mn></mrow></msub 
+></mrow></msub 
+></math>)))))))
+  (<!--l. 14--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><mo 
+class="MathClass-rel" stretchy="false">≢</mo></math> ((<span 
+class="cmss-9">_</span><!--l. 14--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><msub><mrow 
+></mrow><mrow 
+><msub><mrow 
+></mrow><mrow 
+><mn>0</mn></mrow></msub 
+></mrow></msub 
+></math> <span 
+class="cmss-9">closure</span>)) ((<span 
+class="cmss-9">_</span><!--l. 14--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><msub><mrow 
+></mrow><mrow 
+><msub><mrow 
+></mrow><mrow 
+><mn>0</mn></mrow></msub 
+></mrow></msub 
+></math> <span 
+class="cmss-9">list</span>)) ((<span 
+class="cmss-9">_</span><!--l. 14--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><msub><mrow 
+></mrow><mrow 
+><msub><mrow 
+></mrow><mrow 
+><mn>0</mn></mrow></msub 
+></mrow></msub 
+></math> <span 
+class="cmss-9">quote</span>)))
+  (<span 
+class="cmss-9">sym </span><span 
+class="cmss-9">_</span><!--l. 15--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><msub><mrow 
+></mrow><mrow 
+><msub><mrow 
+></mrow><mrow 
+><mn>0</mn></mrow></msub 
+></mrow></msub 
+></math>)))
+                                     </p><!--l. 1--><p class="noindent" >
+                                     </p>
+                                       <h3 class="sectionHead"><span class="titlemark">6.   </span> <a 
+ id="x1-120006"></a>Conclusion</h3>
+                                     <!--l. 3--><p class="noindent" >Quines have a long and interesting history: the term “quine”
+                                     was coined by Douglas Hofstadter (<span class="cite"><a 
+href="#XGEB79">1979</a></span>) in honor of the
+
+logician Willard van Orman Quine, but the concept goes back
+to Kleene’s recursion theorems (<span class="cite"><a 
+href="#XRogers:1967">Rogers</a></span> <span class="cite"><a 
+href="#XRogers:1967">1967</a></span>).
+</p><!--l. 8--><p class="indent" >In section <a 
+href="#x1-100004">4<!--tex4ht:ref: sec:extending-interpreter --></a> we describe how the
+<span 
+class="cmti-9">absent</span><!--l. 10--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><mspace width="0.17em" class="thinspace"/><mi 
+>o</mi> </math>
+constraint can be used to distinguish general procedure
+application from uses of built-in primitives, and how this
+approach correctly handles shadowing of primitives. However,
+there are other ways to distinguish between application
+and uses of primitives. Our first efforts involved tagging
+procedure applications—that is, the Scheme expression
+(<span 
+class="cmti-9">e</span><!--l. 19--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><msub><mrow 
+></mrow><mrow 
+><msub><mrow 
+></mrow><mrow 
+><mn>1</mn> </mrow> </msub 
+> </mrow> </msub 
+> </math> <span 
+class="cmti-9">e</span><!--l. 19--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><msub><mrow 
+></mrow><mrow 
+><msub><mrow 
+></mrow><mrow 
+><mn>2</mn></mrow></msub 
+></mrow></msub 
+></math>)
+would be written in the interpreted language as
+(<span 
+class="cmss-9">app </span><span 
+class="cmti-9">e</span><!--l. 22--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><msub><mrow 
+></mrow><mrow 
+><msub><mrow 
+></mrow><mrow 
+><mn>1</mn> </mrow> </msub 
+> </mrow> </msub 
+> </math> <span 
+class="cmti-9">e</span><!--l. 22--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><msub><mrow 
+></mrow><mrow 
+><msub><mrow 
+></mrow><mrow 
+><mn>2</mn></mrow></msub 
+></mrow></msub 
+></math>).
+Although this works, it is problematic in that generated
+programs are not quite Scheme programs. The tagging of
+application is especially problematic in the presence of <span 
+class="cmbx-9">quote</span>
+and becomes most obvious when attempting to generate and
+interpret quines. A special “unparser” could be used to remove
+the <span 
+class="cmss-9">app </span>tags, making the answers readable. The tagless
+approach, however, allows the results of running the interpreter
+backwards to be pasted directly into the Scheme REPL and run
+without modification, while also allowing built-in forms to be
+shadowed.
+</p><!--l. 144--><p class="noindent" >
+</p>
+<h3 class="likesectionHead"><a 
+ id="x1-13000"></a>Acknowledgments</h3>
+<!--l. 1--><p class="noindent" >Stuart Halloway asked if an earlier version of our relational
+interpreter could generate quines. His thirty-second question
+inspired the work described in this paper and resulted in
+significant improvements to miniKanren. We thank Stuart for
+his question, and look forward to his next challenge.
+</p><!--l. 7--><p class="indent" >Many students in the Indiana University <span 
+class="cmss-9">pl-wonks </span>group
+joined us for an advanced programming languages course the
+semester after Stuart asked his question; one of the main topics
+of the course was running interpreters backwards. That group of
+students deserves our appreciation and thanks both for their
+wisdom and enthusiasm. Among that group was Claire Alvis,
+who was instrumental in implementing our constraint system
+cKanren, which allowed everyone in this course to build
+backward-running interpreters. She, too, deserves much
+credit. We thank Jason Hemann, Aaron Todd, and Cameron
+Swords for their involvement in developing software (some of
+which found its way into this paper) and their generally
+helpful comments. Jason also helped Dan with LaTeX and
+revision control issues, and was instrumental in improving
+appendix <a 
+href="#x1-21000D">D<!--tex4ht:ref: mkimplementationsection --></a>.
+</p><!--l. 21--><p class="indent" >None of this would have been possible without the incredibly
+useful and timely observations of Mitchell Wand and Steve
+Ganz. Oleg Kiselyov joined this effort early on and he has been
+a constant rudder, keeping us grounded to the mathematics of
+logic programming. Everything in miniKanren has been influenced
+by the ideas of Oleg. Please accept our thanks for all your help.
+Chung-chieh Shan offered to revise our implementation of
+miniKanren, which first appeared in the <span 
+class="cmti-9">The Reasoned</span>
+<span 
+class="cmti-9">Schemer</span>. Our later implementations, including cKanren,
+<!--l. 29--><math 
+ xmlns="http://www.w3.org/1998/Math/MathML"  
+display="inline" ><mi 
+>α</mi></math>Kanren,
+and this newer miniKanren, have barely veered away from
+Chung-chieh’s masterful code. We appreciate and thank him for
+this extraordinarily elegant code. As always, we thank Dorai
+Sitaram for SLaTeX. We also thank Ramana Kumar and the
+anonymous reviewers for their comments.
+</p><!--l. 35--><p class="indent" >Working on a long-lived project, it is always difficult to recall all those we want to thank, but hopefully between the
+                                     acknowledgments in our other papers and book we have not
+                                     missed anyone.
+                                     </p>
+
 <div class="live" id="ex1">
 (load "testall.scm")</div>
 
