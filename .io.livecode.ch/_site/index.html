@@ -9,6 +9,10 @@
 <li>Daniel P. Friedman</li>
 </ul>
 
+<div class="live norun hidden" id="appendixD">
+(load "appendixD.scm")
+</div>
+
 <h2>Abstract</h2>
 
 <p class="noindent" >We present relational interpreters for several subsets of Scheme,
@@ -316,6 +320,219 @@ class="cmbx-9">quote </span>expressions,
                                      </p>
                                        <h3 class="sectionHead"><span class="titlemark">2.   </span> <a 
  id="x1-60002"></a>The Extended miniKanren Language</h3>
+
+<div class="live" id="lang-1" data-lib="appendixD">
+(run 1 (q) (fresh (x y z) (== x z) (== 3 y)))
+</div>
+
+<div class="live" id="lang-2" data-lib="appendixD">
+(run 1 (y)
+  (fresh (x z) 
+    (== x z)
+    (== 3 y)))
+</div>
+
+<div class="live" id="lang-3" data-lib="appendixD">
+(run 1 (q)
+  (fresh (x z)
+    (== x z)
+    (== 3 z)
+    (== q x)))
+</div>
+
+<div class="live" id="lang-4" data-lib="appendixD">
+(run 1 (y)
+  (fresh (x y)
+    (== 4 x)
+    (== x y))
+  (== 3 y))
+</div>
+
+<div class="live" id="lang-5" data-lib="appendixD">
+(run 1 (x) (== 4 3))
+</div>
+
+<div class="live" id="lang-6" data-lib="appendixD">
+(run 1 (x) (== 5 x) (== 6 x))
+</div>
+
+<div class="live" id="lang-7" data-lib="appendixD">
+(run 2 (q)
+  (fresh (w x y)
+    (conde
+      ((== `(,x ,w ,x) q)
+       (== y w))
+      ((== `(,w ,x ,w) q)
+       (== y w)))))
+</div>
+
+<div class="live" id="lang-8" data-lib="appendixD">
+(run 6 (q)
+  (let loop ()
+    (conde
+      ((== #f q))
+      ((== #t q))
+      ((loop)))))
+</div>
+
+<div class="live norun" id="anyo">
+(define anyo 
+  (lambda (g)
+    (conde
+      (g)
+      ((anyo g)))))
+</div>
+
+<div class="live" id="lang-9" data-lib="appendixD anyo">
+(run 5 (q)
+  (conde
+    ((anyo (== #f q)))
+    ((== #t q))))
+</div>
+
+<div class="live" id="lang-10" data-lib="appendixD anyo">
+(run 10 (q)
+  (anyo 
+   (conde
+     ((== 1 q))
+     ((== 2 q))
+     ((== 3 q)))))
+</div>
+
+<div class="live" id="lang-11" data-lib="appendixD anyo">
+(run 3 (q)
+  (let ((nevero (anyo (== #f #t))))
+    (conde
+      ((== 1 q))
+      (nevero)
+      ((conde
+         ((== 2 q))
+         (nevero)
+         ((== 3 q)))))))
+</div>
+
+<div class="live" id="lang-12" data-lib="appendixD">
+(run* (q) (symbolo q))
+</div>
+
+<div class="live" id="lang-13" data-lib="appendixD">
+(run* (q)
+  (symbolo q)
+  (== 4 q))
+</div>
+
+<div class="live" id="lang-14" data-lib="appendixD">
+(run* (q)
+  (symbolo q)
+  (numbero q))
+</div>
+
+<div class="live" id="lang-15" data-lib="appendixD">
+(run* (q) (numbero q))
+</div>
+
+<div class="live" id="lang-16" data-lib="appendixD">
+(run* (q)
+  (numbero q)
+  (== 4 q))
+</div>
+
+<div class="live" id="lang-17" data-lib="appendixD">
+(run* (q)
+  (numbero q)
+  (numbero q))
+</div>
+
+<div class="live" id="lang-18" data-lib="appendixD">
+(run* (p) (=/= p 1))
+</div>
+
+<div class="live" id="lang-19" data-lib="appendixD">
+(run* (p) (=/= 1 p) (== 1 p))
+</div>
+
+<div class="live" id="lang-20" data-lib="appendixD">
+(run* (q)
+  (fresh (p r)
+    (=/= '(1 2) `(,p ,r))
+    (== `(,p ,r) q)))
+</div>
+
+<div class="live" id="lang-21" data-lib="appendixD">
+(run* (q)
+  (fresh (p r)
+    (=/= '((1) (2)) `((,p) (,r)))
+    (== `(,p ,r) q)))
+</div>
+
+<div class="live" id="lang-22" data-lib="appendixD">
+(run* (q)
+  (fresh (p r)
+    (=/= `((1) (,r)) `((,p) (2)))
+    (== `(,p ,r) q)))
+</div>
+
+<div class="live" id="lang-23" data-lib="appendixD">
+(run* (q)
+  (fresh (p r)
+    (=/= '(1 2) `(,p ,r))
+    (== 1 p)
+    (== `(,p ,r) q)))
+</div>
+
+<div class="live" id="lang-24" data-lib="appendixD">
+(run* (q)
+  (fresh (p r)
+    (=/= '(1 2) `(,p ,r))
+    (== 1 p)
+    (== 2 r)
+    (== `(,p ,r) q)))
+</div>
+
+<div class="live" id="lang-25" data-lib="appendixD">
+(run* (q)
+  (fresh (p r)
+    (=/= '(1 2) `(,p ,r))
+    (== 1 p)
+    (symbolo r)
+    (== `(,p ,r) q)))
+</div>
+
+<div class="live" id="lang-26" data-lib="appendixD">
+(run* (q)
+  (fresh (x y)
+    (== `(jackal (,y leopard ,x)) q)
+    (absento 'panda q)))
+</div>
+
+<div class="live" id="lang-27" data-lib="appendixD">
+(run* (q)
+  (fresh (x y)
+    (== `(jackal (,y leopard ,x)) q)
+    (absento 'panda q)
+    (== 'panda x)))
+</div>
+
+<div class="live" id="lang-28" data-lib="appendixD">
+(run* (q)
+  (fresh (x y)
+    (== `(jackal (,y leopard ,x)) q)
+    (absento 'panda q)
+    (symbolo x)))
+</div>
+
+<div class="live" id="lang-29" data-lib="appendixD">
+(run* (q)
+  (fresh (x y z)
+    (== `(jackal (,y leopard ,x)) q)
+    (absento 'panda q)
+    (symbolo x)
+    (== `(c ,z d) y)
+    (== 'panda z)))
+</div>
+
+
+
                                      <!--l. 4--><p class="noindent" >In this section we briefly review the core miniKanren
                                      language (section <a 
 href="#x1-70002.1">2.1<!--tex4ht:ref: mkreferesher --></a>), then introduce the
