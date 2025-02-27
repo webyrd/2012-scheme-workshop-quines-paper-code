@@ -53,55 +53,31 @@ href="#Xthe_quine_page">Thompson II</a></span>); the simplest Scheme quines
 are self-evaluating literals, such as numbers and booleans. A
 classic non-trivial quine (<span class="cite"><a 
 href="#Xthe_quine_page">Thompson II</a></span>) is:
-(<span 
-class="cmbx-9">define </span><span 
-class="cmti-9">quine</span><!--l. 2--><math 
- xmlns="http://www.w3.org/1998/Math/MathML"  
-display="inline" ><mi 
->c</mi> </math>
-’((<span 
-class="cmss-9">lambda </span>(<span 
-class="cmss-9">x</span>)
-(<span 
-class="cmss-9">list x </span>(<span 
-class="cmss-9">list </span>(<span 
-class="cmss-9">quote quote</span>) <span 
-class="cmss-9">x</span>)))
-(<span 
-class="cmss-9">quote</span>
-(<span 
-class="cmss-9">lambda </span>(<span 
-class="cmss-9">x</span>)
-(<span 
-class="cmss-9">list x </span>(<span 
-class="cmss-9">list </span>(<span 
-class="cmss-9">quote quote</span>) <span 
-class="cmss-9">x</span>))))))
-</p><!--l. 18--><p class="noindent" >We can easily verify  that                              <span 
+
+<div class="live" id="quinec">
+(define quinec 
+  '((lambda (x)
+      (list x (list (quote quote) x)))
+    (quote
+      (lambda (x)
+        (list x (list (quote quote) x))))))
+</div>
+
+
+<p class="noindent" >We can easily verify  that
+<span 
 class="cmti-9">quine</span><!--l. 2--><math 
  xmlns="http://www.w3.org/1998/Math/MathML"  
 display="inline" ><mi 
 >c</mi></math>
                                      evaluates to itself:
-                                     </p><!--l. 22--><p class="noindent" >(<span 
-class="cmti-9">equal? </span>(<span 
-class="cmti-9">eval quine</span><!--l. 2--><math 
- xmlns="http://www.w3.org/1998/Math/MathML"  
-display="inline" ><mi 
->c</mi></math>)
-                                     <span 
-class="cmti-9">quine</span><!--l. 2--><math 
- xmlns="http://www.w3.org/1998/Math/MathML"  
-display="inline" ><mi 
->c</mi></math>)
-                                     <!--l. 22--><math 
- xmlns="http://www.w3.org/1998/Math/MathML"  
-display="inline" > <mo 
-class="MathClass-rel" stretchy="false">⇒</mo></math>
-                                     <span 
-class="cmtt-9">#</span><span 
-class="cmss-9">t</span>
-                                     </p><!--l. 26--><p class="indent" >  For decades programmers have amused themselves by writing
+                                     </p>
+
+<div class="live" id="verify-quinec" data-lib="quinec">
+(equal? (eval quinec) quinec)
+</div>
+
+<p class="indent" >  For decades programmers have amused themselves by writing
                                      quines in countless programming languages. Some quines, such
                                      as those featured in the International Obfuscated C Code
                                      Contest (<span class="cite"><a 
@@ -5113,7 +5089,7 @@ anonymous reviewers for their comments.
                                      missed anyone.
                                      </p>
 
-<div class="live" id="ex1">
+<div class="live" id="testall">
 (load "testall.scm")</div>
 
 {% endblock %}
