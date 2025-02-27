@@ -13,6 +13,14 @@
 (load "appendixD.scm")
 </div>
 
+<div class="live norun hidden" id="appendixC">
+(load "appendixC.scm")
+</div>
+
+<div class="live norun hidden" id="interp-helpers">
+(load "interp-helpers.scm")
+</div>
+
 <h2>Abstract</h2>
 
 <p class="noindent" >We present relational interpreters for several subsets of Scheme,
@@ -2191,6 +2199,120 @@ class="MathClass-rel" stretchy="false">⇒</mo></math> ()
                                      </p>
                                        <h3 class="sectionHead"><span class="titlemark">3.   </span> <a 
  id="x1-90003"></a>Translating an Interpreter from Scheme to miniKanren</h3>
+
+<div class="live norun" id="eval-exp">
+(define eval-exp
+  (lambda (exp env)
+    (dmatch exp
+      ((,rator ,rand)
+       (let ((proc (eval-exp rator env))
+             (arg (eval-exp rand env)))
+         (dmatch proc
+           ((closure ,x ,body ,env2)
+            (eval-exp body `((,x . ,arg) . ,env2))))))      
+      ((lambda (,x) ,body)
+       (guard (symbol? x) (not-in-env 'lambda env))
+       `(closure ,x ,body ,env))
+      (,x (guard (symbol? x)) (lookup x env)))))
+
+(define big-omega
+  '((lambda (lambda) (lambda lambda))
+    (lambda (lambda) (lambda lambda))))
+</div>
+
+<div class="live" id="eval-omega" data-lib="appendixD appendixC interp-helpers eval-exp">
+; diverges!
+(eval-exp big-omega '())
+</div>
+
+<div class="live" id="interp-1" data-lib="appendixD appendixC interp-helpers eval-exp">
+(eval-exp
+ '(((lambda (x)
+      (lambda (y) x))
+    (lambda (z) z))
+   (lambda (a) a))
+ '())
+</div>
+
+<div class="live" id="interp-2" data-lib="appendixD appendixC interp-helpers eval-exp">
+(eval-exp
+ '((lambda (x)
+     (lambda (y) x))
+   (lambda (z) z))
+ '())
+</div>
+
+<div class="live norun" id="lookupo0">
+(define fail (== #f #t))
+
+(define lookupo
+  (lambda (x env t)
+    (conde
+      ((== '() env) fail)
+      ((fresh (y v rest)
+         (== `((,y . ,v) . ,rest) env) (== y x)
+         (== v t)))
+      ((fresh (y v rest)
+         (== `((,y . ,v) . ,rest) env) (=/= y x)
+         (lookupo x rest t))))))
+</div>
+
+<div class="live" id="interp-3" data-lib="appendixD appendixC interp-helpers lookupo0">
+(run* (q) (lookupo 'y '((x . foo) (y . bar)) q))
+</div>
+
+<div class="live" id="interp-4" data-lib="appendixD appendixC interp-helpers lookupo0">
+(run* (q) (lookupo 'w '((x . foo) (y . bar)) q))
+</div>
+
+<div class="live norun" id="lookupo">
+(define lookupo
+  (lambda (x env t)
+    (fresh (y v rest)
+      (== `((,y . ,v) . ,rest) env)
+      (conde
+        ((== y x) (== v t))
+        ((=/= y x) (lookupo x rest t))))))
+</div>
+
+<div class="live" id="interp-5" data-lib="appendixD appendixC interp-helpers lookupo">
+  (run* (q) (lookupo 'y '((x . foo) (y . bar)) q))
+</div>
+
+<div class="live" id="interp-6" data-lib="appendixD appendixC interp-helpers lookupo">
+(run* (q) (lookupo 'w '((x . foo) (y . bar)) q))
+</div>
+
+<div class="live norun" id="eval-expo">
+(define eval-expo
+  (lambda (exp env val)
+    (conde
+      ((fresh (rator rand x body env2 a)
+         (== `(,rator ,rand) exp)
+         (eval-expo rator env `(closure ,x ,body ,env2))
+         (eval-expo rand env a)
+         (eval-expo body `((,x . ,a) . ,env2) val)))
+      ((fresh (x body)
+         (== `(lambda (,x) ,body) exp)
+         (symbolo x)
+         (== `(closure ,x ,body ,env) val)
+         (not-in-envo 'lambda env)))
+      ((symbolo exp) (lookupo exp env val)))))
+</div>
+
+<div class="live" id="interp-7" data-lib="appendixD appendixC interp-helpers lookupo eval-expo">
+(run 5 (q)
+  (fresh (e v)
+    (eval-expo e '() v)
+    (== `(,e -> ,v) q)))
+</div>
+
+<div class="live" id="interp-8" data-lib="appendixD appendixC interp-helpers lookupo eval-expo">
+(run 5 (q)
+  (eval-expo q '() '(closure y x ((x . (closure z z ()))))))
+</div>
+
+
                                      <!--l. 4--><p class="noindent" >In this section we start with a standard
                                      environment-passing interpreter for the call-by-value
                                      <!--l. 5--><math 
